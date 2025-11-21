@@ -1,4 +1,4 @@
-package input
+package main
 
 /*
 
@@ -280,7 +280,3 @@ map_sokol_mouse_button :: proc "c" (sokol_mouse_button: sapp.Mousebutton) -> Key
 	}
 	return nil
 }
-
-Vec2 :: [2]f32
-Vec3 :: [3]f32
-Vec4 :: [4]f32

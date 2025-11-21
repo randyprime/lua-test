@@ -15,8 +15,6 @@ Consider this like the bald/utils package, but for stuff tangled with the game.
 
 */
 
-import "bald:input"
-import "bald:sound"
 import "bald:utils"
 import "bald:utils/color"
 import "bald:utils/shape"
@@ -111,27 +109,27 @@ get_screen_space_proj :: proc() -> Matrix4 {
 
 is_action_pressed :: proc(action: Input_Action) -> bool {
 	key := key_from_action(action)
-	return input.key_pressed(key)
+	return key_pressed(key)
 }
 is_action_released :: proc(action: Input_Action) -> bool {
 	key := key_from_action(action)
-	return input.key_released(key)
+	return key_released(key)
 }
 is_action_down :: proc(action: Input_Action) -> bool {
 	key := key_from_action(action)
-	return input.key_down(key)
+	return key_down(key)
 }
 
 consume_action_pressed :: proc(action: Input_Action) {
 	key := key_from_action(action)
-	input.consume_key_pressed(key)
+	consume_key_pressed(key)
 }
 consume_action_released :: proc(action: Input_Action) {
 	key := key_from_action(action)
-	input.consume_key_released(key)
+	consume_key_released(key)
 }
 
-key_from_action :: proc(action: Input_Action) -> input.Key_Code {
+key_from_action :: proc(action: Input_Action) -> Key_Code {
 	key, found := action_map[action]
 	if !found {
 		log.debugf("action %v not bound to any key", action)
@@ -251,8 +249,8 @@ screen_pivot :: proc(pivot: Pivot) -> (x, y: f32) {
 raw_button :: proc(rect: Rect) -> (hover, pressed: bool) {
 	mouse_pos := mouse_pos_in_current_space()
 	hover = shape.rect_contains(rect, mouse_pos)
-	if hover && input.key_pressed(.LEFT_MOUSE) {
-		input.consume_key_pressed(.LEFT_MOUSE)
+	if hover && key_pressed(.LEFT_MOUSE) {
+		consume_key_pressed(.LEFT_MOUSE)
 		pressed = true
 	}
 	return
@@ -265,7 +263,7 @@ mouse_pos_in_current_space :: proc() -> Vec2 {
 		log.error("not in a space, need to push_coord_space first")
 	}
 	
-	mouse := Vec2{input.state.mouse_x, input.state.mouse_y}
+	mouse := Vec2{state.mouse_x, state.mouse_y}
 
 	ndc_x := (mouse.x / (f32(window_w) * 0.5)) - 1.0;
 	ndc_y := (mouse.y / (f32(window_h) * 0.5)) - 1.0;
@@ -285,5 +283,5 @@ mouse_pos_in_current_space :: proc() -> Vec2 {
 // SOUND
 
 emit_sound_from_entity :: proc(event_name: string, e: ^Entity) {
-	sound.play_continuously(event_name, fmt.tprint(e.handle.id), e.pos)
+	sound_play_continuously(event_name, fmt.tprint(e.handle.id), e.pos)
 }

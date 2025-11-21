@@ -3,16 +3,10 @@ package main
 
 /*
 
-This is the file where you actually make the game.
-
-It will grow pretty phat. This is where the magic happens.
-
-GAMEPLAY O'CLOCK !
+GAMEPLAY O'CLOCK MEGAFILE
 
 */
 
-import "bald:input"
-import "bald:sound"
 import "bald:utils"
 import "bald:utils/color"
 
@@ -65,7 +59,7 @@ Game_State :: struct {
 //
 // action -> key mapping
 
-action_map: map[Input_Action]input.Key_Code = {
+action_map: map[Input_Action]Key_Code = {
 	.left = .A,
 	.right = .D,
 	.up = .W,
@@ -157,13 +151,13 @@ app_frame :: proc() {
 		draw_text({x, y}, "hello world.", z_layer=.ui, pivot=Pivot.top_left)
 	}
 
-	sound.play_continuously("event:/ambiance", "")
+	sound_play_continuously("event:/ambiance", "")
 
 	game_update()
 	game_draw()
 
 	volume :f32= 0.75
-	sound.update(get_player().pos, volume)
+	sound_update(get_player().pos, volume)
 }
 
 app_shutdown :: proc() {
@@ -200,12 +194,12 @@ game_update :: proc() {
 		}
 	}
 
-	if input.key_pressed(.LEFT_MOUSE) {
-		input.consume_key_pressed(.LEFT_MOUSE)
+	if key_pressed(.LEFT_MOUSE) {
+		consume_key_pressed(.LEFT_MOUSE)
 
 		pos := mouse_pos_in_current_space()
 		log.info("schloop at", pos)
-		sound.play("event:/schloop", pos=pos)
+		sound_play("event:/schloop", pos=pos)
 	}
 
 	utils.animate_to_target_v2(&ctx.gs.cam_pos, get_player().pos, ctx.delta_t, rate=10)

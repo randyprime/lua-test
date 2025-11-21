@@ -2,27 +2,11 @@ package main
 
 /*
 
-variable_main_loop_v1
-
-This is the main entrypoint & structure of the frame / update loop.
-
-This is an example of a simple variable timestep update & render, which I've found
-to be a great sweet spot for small to medium sized singleplayer games.
-
-Ideally, things are structured here in a way where you can just swap in a different main file
-that does a different structure, like multiplayer, fixed timestep, etc, and it be kinda fine.
-^ we'll see how this pans out
-
-note:
-It doesn't make sense to abstract this away into a package,
-because it can vary depending on the game that's being made,
-and is highly tangled with game state.
+Main entrypoint & structure of the frame / update loop.
 
 */
 
-import "bald:sound"
 import "bald:utils"
-import "bald:input"
 import "bald:utils/shape"
 import "bald:utils/logger"
 
@@ -63,7 +47,7 @@ main :: proc() {
 		init_cb = core_app_init,
 		frame_cb = core_app_frame,
 		cleanup_cb = core_app_shutdown,
-		event_cb = input.event_callback,
+		event_cb = event_callback,
 		width = i32(window_w),
 		height = i32(window_h),
 		window_title = WINDOW_TITLE,
@@ -90,13 +74,13 @@ core_app_init :: proc "c" () { // these sokol callbacks are c procs
 		win32.FreeConsole()
 	}
 
-	sound.init()
+	sound_init()
 
 	entity_init_core()
 
 	_actual_game_state = new(Game_State)
 
-	input.window_resize_callback = proc(width: int, height: int) {
+	window_resize_callback = proc(width: int, height: int) {
 		window_w = width
 		window_h = height
 	}
@@ -141,9 +125,9 @@ core_app_frame :: proc "c" () {
 	// we're just using the underlying game state for now, nothing fancy
 	ctx.gs = _actual_game_state
 	// also just using underlying input state, nothing fancy
-	input.state = &input._actual_input_state
+	state = &_actual_input_state
 
-	if input.key_pressed(.ENTER) && input.key_down(.LEFT_ALT) {
+	if key_pressed(.ENTER) && key_down(.LEFT_ALT) {
 		sapp.toggle_fullscreen()
 	}
 
@@ -151,7 +135,7 @@ core_app_frame :: proc "c" () {
 	app_frame()
 	core_render_frame_end()
 
-	input.reset_input_state(input.state)
+	reset_input_state(state)
 	free_all(context.temp_allocator)
 
 	app_ticks += 1

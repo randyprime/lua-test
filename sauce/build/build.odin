@@ -118,16 +118,16 @@ main :: proc() {
 
 		switch target {
 			case .windows:
-			append(&files_to_copy, "sauce/bald/sound/fmod/studio/lib/windows/x64/fmodstudio.dll")
-			append(&files_to_copy, "sauce/bald/sound/fmod/studio/lib/windows/x64/fmodstudioL.dll")
-			append(&files_to_copy, "sauce/bald/sound/fmod/core/lib/windows/x64/fmod.dll")
-			append(&files_to_copy, "sauce/bald/sound/fmod/core/lib/windows/x64/fmodL.dll")
+			append(&files_to_copy, "sauce/fmod/studio/lib/windows/x64/fmodstudio.dll")
+			append(&files_to_copy, "sauce/fmod/studio/lib/windows/x64/fmodstudioL.dll")
+			append(&files_to_copy, "sauce/fmod/core/lib/windows/x64/fmod.dll")
+			append(&files_to_copy, "sauce/fmod/core/lib/windows/x64/fmodL.dll")
 
 			case .mac:
-			append(&files_to_copy, "sauce/bald/sound/fmod/studio/lib/darwin/libfmodstudio.dylib")
-			append(&files_to_copy, "sauce/bald/sound/fmod/studio/lib/darwin/libfmodstudioL.dylib")
-			append(&files_to_copy, "sauce/bald/sound/fmod/core/lib/darwin/libfmod.dylib")
-			append(&files_to_copy, "sauce/bald/sound/fmod/core/lib/darwin/libfmodL.dylib")
+			append(&files_to_copy, "sauce/fmod/studio/lib/darwin/libfmodstudio.dylib")
+			append(&files_to_copy, "sauce/fmod/studio/lib/darwin/libfmodstudioL.dylib")
+			append(&files_to_copy, "sauce/fmod/core/lib/darwin/libfmod.dylib")
+			append(&files_to_copy, "sauce/fmod/core/lib/darwin/libfmodL.dylib")
 		}
 
 		for src in files_to_copy {
