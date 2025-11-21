@@ -11,9 +11,9 @@ Relies on the fact that we're generating a compatible shader via the build step 
 
 */
 
-import "bald:utils"
-import "bald:utils/color"
-import shape "bald:utils/shape"
+import "utils"
+import "utils/color"
+import shape "utils/shape"
 
 import "core:mem"
 import "core:log"

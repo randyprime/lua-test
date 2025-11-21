@@ -10,7 +10,7 @@ Just plug in event_callback in sokol setup and call it a day.
 
 import "core:log"
 
-import sapp "bald:sokol/app"
+import sapp "sokol/app"
 
 // points to the input state all high level calls will act upon
 state: ^Input
@@ -87,7 +87,7 @@ window_resize_callback: proc(width: int, height: int)
 
 _actual_input_state: Input
 
-import "bald:utils/logger"
+import "utils/logger"
 
 // takes all the incoming input events
 event_callback :: proc "c" (event: ^sapp.Event) { // events example: https://floooh.github.io/sokol-html5/events-sapp.html

@@ -15,9 +15,9 @@ Consider this like the bald/utils package, but for stuff tangled with the game.
 
 */
 
-import "bald:utils"
-import "bald:utils/color"
-import "bald:utils/shape"
+import "utils"
+import "utils/color"
+import "utils/shape"
 
 import "core:log"
 import "core:fmt"

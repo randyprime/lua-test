@@ -19,9 +19,8 @@ import "core:log"
 import "core:reflect"
 import "core:time"
 
-// we are assuming we're right next to the bald collection
-import logger "../bald/utils/logger"
-import utils "../bald/utils"
+import logger "../utils/logger"
+import utils "../utils"
 
 EXE_NAME :: "game"
 
@@ -102,8 +101,6 @@ main :: proc() {
 			"build",
 			"sauce",
 			"-debug",
-			"-collection:bald=sauce/bald",
-			"-collection:user=sauce",
 			fmt.tprintf("-out:%v/%v.exe", out_dir, EXE_NAME),
 		}
 		// not needed, it's easier to just generate code into generated.odin

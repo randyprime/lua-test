@@ -43,7 +43,7 @@ I'll keep this like this for now, since I'm not sure if there's gonna be other t
 
 */
 
-import "bald:utils"
+import "utils"
 
 //
 // DRAW

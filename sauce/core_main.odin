@@ -6,9 +6,9 @@ Main entrypoint & structure of the frame / update loop.
 
 */
 
-import "bald:utils"
-import "bald:utils/shape"
-import "bald:utils/logger"
+import "utils"
+import "utils/shape"
+import "utils/logger"
 
 import "core:sync"
 import "core:strings"
@@ -20,10 +20,10 @@ import "core:time"
 import "base:runtime"
 import "base:builtin"
 
-import sapp "bald:sokol/app"
-import sg "bald:sokol/gfx"
-import sglue "bald:sokol/glue"
-import slog "bald:sokol/log"
+import sapp "sokol/app"
+import sg "sokol/gfx"
+import sglue "sokol/glue"
+import slog "sokol/log"
 
 import win32 "core:sys/windows" // wait, how is this building on mac?
 

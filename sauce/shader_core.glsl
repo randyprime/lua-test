@@ -3,7 +3,7 @@
 
 // syntax reference: https://github.com/floooh/sokol-tools/blob/master/docs/sokol-shdc.md
 @header package main
-@header import sg "bald:sokol/gfx"
+@header import sg "sokol/gfx"
 
 @ctype vec4 Vec4
 @ctype mat4 Matrix4

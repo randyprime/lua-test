@@ -1,8 +1,8 @@
 package main
 
-import "bald:utils"
-import "bald:utils/color"
-import shape "bald:utils/shape"
+import "utils"
+import "utils/color"
+import shape "utils/shape"
 
 import tt "vendor:stb/truetype"
 

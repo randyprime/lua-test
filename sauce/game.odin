@@ -7,8 +7,8 @@ GAMEPLAY O'CLOCK MEGAFILE
 
 */
 
-import "bald:utils"
-import "bald:utils/color"
+import "utils"
+import "utils/color"
 
 import "core:log"
 import "core:fmt"
@@ -16,7 +16,7 @@ import "core:mem"
 import "core:math"
 import "core:math/linalg"
 
-import sapp "bald:sokol/app"
+import sapp "sokol/app"
 import spall "core:prof/spall"
 
 VERSION :string: "v0.0.0"

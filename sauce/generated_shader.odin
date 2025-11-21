@@ -1,5 +1,5 @@
 package main
-import sg "bald:sokol/gfx"
+import sg "sokol/gfx"
 /*
     #version:1# (machine generated, don't edit!)
 

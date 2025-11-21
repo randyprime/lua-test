@@ -1,13 +1,13 @@
 package main
 
-import "bald:utils"
-import "bald:utils/color"
-import shape "bald:utils/shape"
+import "utils"
+import "utils/color"
+import shape "utils/shape"
 
-import sapp "bald:sokol/app"
-import sg "bald:sokol/gfx"
-import sglue "bald:sokol/glue"
-import slog "bald:sokol/log"
+import sapp "sokol/app"
+import sg "sokol/gfx"
+import sglue "sokol/glue"
+import slog "sokol/log"
 
 import "core:prof/spall"
 import "core:mem"
