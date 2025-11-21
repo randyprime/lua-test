@@ -12,7 +12,6 @@ GAMEPLAY O'CLOCK !
 */
 
 import "bald:input"
-import "bald:draw"
 import "bald:sound"
 import "bald:utils"
 import "bald:utils/color"
@@ -150,12 +149,12 @@ app_frame :: proc() {
 
 	{
 		// ui space example
-		draw.push_coord_space(get_screen_space())
+		push_coord_space(get_screen_space())
 
 		x, y := screen_pivot(.top_left)
 		x += 2
 		y -= 2
-		draw.draw_text({x, y}, "hello world.", z_layer=.ui, pivot=Pivot.top_left)
+		draw_text({x, y}, "hello world.", z_layer=.ui, pivot=Pivot.top_left)
 	}
 
 	sound.play_continuously("event:/ambiance", "")
@@ -180,7 +179,7 @@ game_update :: proc() {
 	}
 
 	// this'll be using the last frame's camera position, but it's fine for most things
-	draw.push_coord_space(get_world_space())
+	push_coord_space(get_world_space())
 
 	// setup world for first game tick
 	if ctx.gs.ticks == 0 {
@@ -228,26 +227,26 @@ rebuild_scratch_helpers :: proc() {
 game_draw :: proc() {
 
 	// this is so we can get the current pixel in the shader in world space (VERYYY useful)
-	draw.draw_frame.ndc_to_world_xform = get_world_space_camera() * linalg.inverse(get_world_space_proj())
-	draw.draw_frame.bg_repeat_tex0_atlas_uv = draw.atlas_uv_from_sprite(.bg_repeat_tex0)
+	draw_frame.ndc_to_world_xform = get_world_space_camera() * linalg.inverse(get_world_space_proj())
+	draw_frame.bg_repeat_tex0_atlas_uv = atlas_uv_from_sprite(.bg_repeat_tex0)
 
 	// background thing
 	{
 		// identity matrices, so we're in clip space
-		draw.push_coord_space({proj=Matrix4(1), camera=Matrix4(1)})
+		push_coord_space({proj=Matrix4(1), camera=Matrix4(1)})
 
 		// draw rect that covers the whole screen
-		draw.draw_rect(Rect{ -1, -1, 1, 1}, flags=.background_pixels) // we leave it in the hands of the shader
+		draw_rect(Rect{ -1, -1, 1, 1}, flags=.background_pixels) // we leave it in the hands of the shader
 	}
 
 	// world
 	{
-		draw.push_coord_space(get_world_space())
+		push_coord_space(get_world_space())
 		
-		draw.draw_sprite({10, 10}, .player_still, col_override=Vec4{1,0,0,0.4})
-		draw.draw_sprite({-10, 10}, .player_still)
+		draw_sprite({10, 10}, .player_still, col_override=Vec4{1,0,0,0.4})
+		draw_sprite({-10, 10}, .player_still)
 
-		draw.draw_text({0, -50}, "sugon", pivot=.bottom_center, col={0,0,0,0.1})
+		draw_text({0, -50}, "sugon", pivot=.bottom_center, col={0,0,0,0.1})
 
 		for handle in get_all_ents() {
 			e := entity_from_handle(handle)
@@ -303,7 +302,7 @@ draw_sprite_entity :: proc(
 		col_override.a = max(col_override.a, entity.hit_flash.a)
 	}
 
-	draw.draw_sprite(pos, sprite, pivot, flip_x, draw_offset, xform, anim_index, col, col_override, z_layer, flags, params, crop_top, crop_left, crop_bottom, crop_right)
+	draw_sprite(pos, sprite, pivot, flip_x, draw_offset, xform, anim_index, col, col_override, z_layer, flags, params, crop_top, crop_left, crop_bottom, crop_right)
 }
 
 //
@@ -350,7 +349,7 @@ setup_player :: proc(e: ^Entity) {
 	}
 
 	e.draw_proc = proc(e: Entity) {
-		draw.draw_sprite(e.pos, .shadow_medium, col={1,1,1,0.2})
+		draw_sprite(e.pos, .shadow_medium, col={1,1,1,0.2})
 		draw_entity_default(e)
 	}
 }

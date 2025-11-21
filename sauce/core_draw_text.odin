@@ -1,6 +1,5 @@
-package draw
+package main
 
-import user "user:bald-user"
 import "bald:utils"
 import "bald:utils/color"
 import shape "bald:utils/shape"
@@ -9,12 +8,12 @@ import tt "vendor:stb/truetype"
 
 draw_text :: draw_text_with_drop_shadow
 
-draw_text_wrapped :: proc(pos: Vec2, text: string, wrap_width: f32, col:=color.WHITE, scale:= 1.0, pivot:=utils.Pivot.bottom_left, z_layer:= user.ZLayer.nil, col_override:=Vec4{0,0,0,0}) -> Vec2 {
+draw_text_wrapped :: proc(pos: Vec2, text: string, wrap_width: f32, col:=color.WHITE, scale:= 1.0, pivot:=utils.Pivot.bottom_left, z_layer:= ZLayer.nil, col_override:=Vec4{0,0,0,0}) -> Vec2 {
 	// TODO
 	return draw_text_no_drop_shadow(pos, text, col, scale, pivot, z_layer, col_override)
 }
 
-draw_text_with_drop_shadow :: proc(pos: Vec2, text: string, drop_shadow_col:=color.BLACK, col:=color.WHITE, scale:= 1.0, pivot:=utils.Pivot.bottom_left, z_layer:= user.ZLayer.nil, col_override:=Vec4{0,0,0,0}) -> Vec2 {
+draw_text_with_drop_shadow :: proc(pos: Vec2, text: string, drop_shadow_col:=color.BLACK, col:=color.WHITE, scale:= 1.0, pivot:=utils.Pivot.bottom_left, z_layer:= ZLayer.nil, col_override:=Vec4{0,0,0,0}) -> Vec2 {
 	
 	offset := Vec2{1,-1} * f32(scale)
 	draw_text_no_drop_shadow(pos+offset, text, col=drop_shadow_col*col,scale=scale,pivot=pivot,z_layer=z_layer,col_override=col_override)
@@ -23,7 +22,7 @@ draw_text_with_drop_shadow :: proc(pos: Vec2, text: string, drop_shadow_col:=col
 	return dim
 }
 
-draw_text_no_drop_shadow :: proc(pos: Vec2, text: string, col:=color.WHITE, scale:= 1.0, pivot:=utils.Pivot.bottom_left, z_layer:= user.ZLayer.nil, col_override:=Vec4{0,0,0,0}) -> (text_bounds: Vec2) {
+draw_text_no_drop_shadow :: proc(pos: Vec2, text: string, col:=color.WHITE, scale:= 1.0, pivot:=utils.Pivot.bottom_left, z_layer:= ZLayer.nil, col_override:=Vec4{0,0,0,0}) -> (text_bounds: Vec2) {
 	using tt
 
 	push_z_layer(z_layer != .nil ? z_layer : draw_frame.active_z_layer)

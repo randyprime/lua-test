@@ -1,17 +1,16 @@
-package draw
+package main
 
 /*
 
-This package is a full-blown 2D pixel art renderer built on top of Sokol
+2D pixel art renderer built on top of Sokol
 
 This file contains all the top-level functions you might want to use to make a game.
-see text.odin for the text helpers
+see draw_text.odin for the text helpers
 
 Relies on the fact that we're generating a compatible shader via the build step with sokol-shdc.exe
 
 */
 
-import user "user:bald-user"
 import "bald:utils"
 import "bald:utils/color"
 import shape "bald:utils/shape"
@@ -32,7 +31,7 @@ draw_sprite :: proc(
 	pos: Vec2,
 
 	// the rect drawn will auto-size based on this
-	sprite: user.Sprite_Name,
+	sprite: Sprite_Name,
 
 	// pivot of the sprite drawn
 	pivot:=utils.Pivot.center_center,
@@ -56,10 +55,10 @@ draw_sprite :: proc(
 	col_override:Vec4={},
 
 	// leave blank and it'll take the currently active layer
-	z_layer:user.ZLayer={},
+	z_layer:ZLayer={},
 
 	// can do anything in the shader with these two things
-	flags:user.Quad_Flags={},
+	flags:Quad_Flags={},
 	params:Vec4={},
 
 	// crop
@@ -73,7 +72,7 @@ draw_sprite :: proc(
 ) {
 
 	rect_size := get_sprite_size(sprite)
-	frame_count := user.get_frame_count(sprite)
+	frame_count := get_frame_count(sprite)
 	rect_size.x /= f32(frame_count)
 
 	/* this was the old one
@@ -111,7 +110,7 @@ draw_rect :: proc(
 	rect: shape.Rect,
 
 	// these are explained below
-	sprite:= user.Sprite_Name.nil,
+	sprite:= Sprite_Name.nil,
 	uv:= DEFAULT_UV,
 
 	// draws an outline
@@ -124,8 +123,8 @@ draw_rect :: proc(
 	// same as above
 	col:=color.WHITE,
 	col_override:Vec4={},
-	z_layer:user.ZLayer={},
-	flags:user.Quad_Flags={},
+	z_layer:ZLayer={},
+	flags:Quad_Flags={},
 	params:Vec4={},
 	crop_top:f32=0.0,
 	crop_left:f32=0.0,
@@ -150,7 +149,7 @@ draw_rect :: proc(
 }
 
 // #cleanup - this should be a utility
-draw_sprite_in_rect :: proc(sprite: user.Sprite_Name, pos: Vec2, size: Vec2, xform := Matrix4(1), col := color.WHITE, col_override:= Vec4{0,0,0,0}, z_layer:=user.ZLayer.nil, flags:=user.Quad_Flags(0), pad_pct :f32= 0.1) {
+draw_sprite_in_rect :: proc(sprite: Sprite_Name, pos: Vec2, size: Vec2, xform := Matrix4(1), col := color.WHITE, col_override:= Vec4{0,0,0,0}, z_layer:=ZLayer.nil, flags:=Quad_Flags(0), pad_pct :f32= 0.1) {
 	img_size := get_sprite_size(sprite)
 	
 	rect := shape.rect_make(pos, size)
@@ -209,7 +208,7 @@ draw_rect_xform :: proc(
 	size: Vec2,
 	
 	// defaults to no sprite (blank color)
-	sprite:= user.Sprite_Name.nil,
+	sprite:= Sprite_Name.nil,
 
 	// defaults to auto-grab the correct UV based on the sprite
 	uv:= DEFAULT_UV,
@@ -222,8 +221,8 @@ draw_rect_xform :: proc(
 	anim_index:=0,
 	col:=color.WHITE,
 	col_override:Vec4={},
-	z_layer:user.ZLayer={},
-	flags:user.Quad_Flags={},
+	z_layer:ZLayer={},
+	flags:Quad_Flags={},
 	params:Vec4={},
 	crop_top:f32=0.0,
 	crop_left:f32=0.0,
@@ -243,7 +242,7 @@ draw_rect_xform :: proc(
 
 		// animation UV hack
 		// we assume all animations are just a long strip
-		frame_count := user.get_frame_count(sprite)
+		frame_count := get_frame_count(sprite)
 		frame_size := size
 		frame_size.x /= f32(frame_count)
 		uv_size := shape.rect_size(uv)

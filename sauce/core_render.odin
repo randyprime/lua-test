@@ -1,6 +1,4 @@
-package draw
-
-import user "user:bald-user"
+package main
 
 import "bald:utils"
 import "bald:utils/color"
@@ -19,10 +17,6 @@ import "core:fmt"
 
 import "core:math"
 import "core:math/linalg"
-Matrix4 :: linalg.Matrix4f32
-Vec2 :: [2]f32
-Vec3 :: [3]f32
-Vec4 :: [4]f32
 
 import stbi "vendor:stb/image"
 import tt "vendor:stb/truetype"
@@ -53,7 +47,7 @@ Vertex :: struct {
 	size: Vec2,
 	tex_index: u8,
 	z_layer: u8,
-	quad_flags: user.Quad_Flags,
+	quad_flags: Quad_Flags,
 	_: [1]u8,
 	col_override: Vec4,
 	params: Vec4,
@@ -96,23 +90,23 @@ render_init :: proc() {
 	})
 	
 	// image stuff
-	render_state.bind.samplers[user.SMP_default_sampler] = sg.make_sampler({})
+	render_state.bind.samplers[SMP_default_sampler] = sg.make_sampler({})
 	
 	// setup pipeline
 	// :vertex layout
 	pipeline_desc : sg.Pipeline_Desc = {
-		shader = sg.make_shader(user.quad_shader_desc(sg.query_backend())),
+		shader = sg.make_shader(quad_shader_desc(sg.query_backend())),
 		index_type = .UINT16,
 		layout = {
 			attrs = {
-				user.ATTR_quad_position = { format = .FLOAT2 },
-				user.ATTR_quad_color0 = { format = .FLOAT4 },
-				user.ATTR_quad_uv0 = { format = .FLOAT2 },
-				user.ATTR_quad_local_uv0 = { format = .FLOAT2 },
-				user.ATTR_quad_size0 = { format = .FLOAT2 },
-				user.ATTR_quad_bytes0 = { format = .UBYTE4N },
-				user.ATTR_quad_color_override0 = { format = .FLOAT4 },
-				user.ATTR_quad_params0 = { format = .FLOAT4 },
+				ATTR_quad_position = { format = .FLOAT2 },
+				ATTR_quad_color0 = { format = .FLOAT4 },
+				ATTR_quad_uv0 = { format = .FLOAT2 },
+				ATTR_quad_local_uv0 = { format = .FLOAT2 },
+				ATTR_quad_size0 = { format = .FLOAT2 },
+				ATTR_quad_bytes0 = { format = .UBYTE4N },
+				ATTR_quad_color_override0 = { format = .FLOAT4 },
+				ATTR_quad_params0 = { format = .FLOAT4 },
 			},
 		}
 	}
@@ -158,8 +152,8 @@ core_render_frame_end :: proc() {
 		}
 	}
 	
-	render_state.bind.images[user.IMG_tex0] = atlas.sg_image
-	render_state.bind.images[user.IMG_font_tex] = font.sg_image
+	render_state.bind.images[IMG_tex0] = atlas.sg_image
+	render_state.bind.images[IMG_font_tex] = font.sg_image
 
 	{
 		sg.update_buffer(
@@ -169,7 +163,7 @@ core_render_frame_end :: proc() {
 		sg.begin_pass({ action = render_state.pass_action, swapchain = sglue.swapchain() })
 		sg.apply_pipeline(render_state.pip)
 		sg.apply_bindings(render_state.bind)
-		sg.apply_uniforms(user.UB_Shader_Data, {ptr=&draw_frame.shader_data, size=size_of(user.Shader_Data)})
+		sg.apply_uniforms(UB_Shader_Data, {ptr=&draw_frame.shader_data, size=size_of(Shader_Data)})
 		sg.draw(0, 6*total_quad_count, 1)
 		sg.end_pass()
 	}
@@ -190,12 +184,12 @@ reset_draw_frame :: proc() {
 Draw_Frame :: struct {
 
 	using reset: struct {
-		quads: [user.ZLayer][dynamic]Quad, // this is super scuffed, but I did this to optimise the sort, I'm sure there's a better fix.
+		quads: [ZLayer][dynamic]Quad, // this is super scuffed, but I did this to optimise the sort, I'm sure there's a better fix.
 		coord_space: Coord_Space,
-		active_z_layer: user.ZLayer,
+		active_z_layer: ZLayer,
 		active_scissor: shape.Rect,
-		active_flags: user.Quad_Flags,
-		using shader_data: user.Shader_Data,
+		active_flags: Quad_Flags,
+		using shader_data: Shader_Data,
 	}
 
 }
@@ -208,12 +202,12 @@ Sprite :: struct {
 	data: [^]byte,
 	atlas_uvs: Vec4,
 }
-sprites: [user.Sprite_Name]Sprite
+sprites: [Sprite_Name]Sprite
 
 load_sprites_into_atlas :: proc() {
 	img_dir := "res/images/"
 	
-	for img_name in user.Sprite_Name {
+	for img_name in Sprite_Name {
 		if img_name == .nil do continue
 		
 		path := fmt.tprint(img_dir, img_name, ".png", sep="")
@@ -267,7 +261,7 @@ load_sprites_into_atlas :: proc() {
 		
 		// copy rect row-by-row into destination atlas
 		for rect in rects {
-			img := &sprites[user.Sprite_Name(rect.id)]
+			img := &sprites[Sprite_Name(rect.id)]
 			
 			rect_w := int(rect.w) - 2
 			rect_h := int(rect.h) - 2
@@ -375,12 +369,12 @@ push_coord_space :: proc(coord: Coord_Space) -> Coord_Space {
 
 
 
-set_z_layer :: proc(zlayer: user.ZLayer) {
+set_z_layer :: proc(zlayer: ZLayer) {
 	draw_frame.active_z_layer = zlayer
 }
 
 @(deferred_out=set_z_layer)
-push_z_layer :: proc(zlayer: user.ZLayer) -> user.ZLayer {
+push_z_layer :: proc(zlayer: ZLayer) -> ZLayer {
 	og := draw_frame.active_z_layer
 	draw_frame.active_z_layer = zlayer
 	return og
@@ -404,8 +398,8 @@ draw_quad_projected :: proc(
 
 	// same as above
 	col_override: Vec4,
-	z_layer: user.ZLayer=.nil,
-	flags: user.Quad_Flags,
+	z_layer: ZLayer=.nil,
+	flags: Quad_Flags,
 	params:= Vec4{},
 	z_layer_queue:=-1,
 ) {
@@ -491,10 +485,10 @@ draw_quad_projected :: proc(
 	verts[3].params = params
 }
 
-atlas_uv_from_sprite :: proc(sprite: user.Sprite_Name) -> Vec4 {
+atlas_uv_from_sprite :: proc(sprite: Sprite_Name) -> Vec4 {
 	return sprites[sprite].atlas_uvs
 }
 
-get_sprite_size :: proc(sprite: user.Sprite_Name) -> Vec2 {
+get_sprite_size :: proc(sprite: Sprite_Name) -> Vec2 {
 	return {f32(sprites[sprite].width), f32(sprites[sprite].height)}
 }

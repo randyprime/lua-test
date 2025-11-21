@@ -1,4 +1,9 @@
-package core_user
+package main
+
+// 2025-11-21
+// TODO, move this code out and delete this file.
+
+
 
 /*
 
@@ -15,13 +20,13 @@ But it'd subtract from the ease of calling the high level draw functions, so pro
 
 it would go from:
 
-draw.draw_sprite(..., .shadow_medium, z_layer=.shadow, flags=.flag2)
+draw_sprite(..., .shadow_medium, z_layer=.shadow, flags=.flag2)
 
 ^ types are known and can be inferred
 
 to:
 
-draw.draw_sprite(..., int(Sprite_Name.shadow_medium), z_layer=int(ZLayer.shadow), flags=u8(Quad_Flags.flag2))
+draw_sprite(..., int(Sprite_Name.shadow_medium), z_layer=int(ZLayer.shadow), flags=u8(Quad_Flags.flag2))
 
 ^ unknown, so we'd need to do more typing
 
@@ -108,13 +113,3 @@ get_frame_count :: proc(sprite: Sprite_Name) -> int {
 	}
 	return frame_count
 }
-
-
-//
-// helpers
-
-import "core:math/linalg"
-Matrix4 :: linalg.Matrix4f32
-Vec2 :: [2]f32
-Vec3 :: [3]f32
-Vec4 :: [4]f32

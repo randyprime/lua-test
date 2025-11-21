@@ -1,6 +1,8 @@
 
+// TODO - merge this with the shader.glsl
+
 // syntax reference: https://github.com/floooh/sokol-tools/blob/master/docs/sokol-shdc.md
-@header package core_user
+@header package main
 @header import sg "bald:sokol/gfx"
 
 @ctype vec4 Vec4
@@ -68,7 +70,7 @@ out vec4 col_out;
 
 @include shader_utils.glsl
 
-@include ../../shader.glsl // this is the user's fragment shader
+@include shader.glsl // this is the user's fragment shader
 
 @end
 

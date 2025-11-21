@@ -16,13 +16,10 @@ Consider this like the bald/utils package, but for stuff tangled with the game.
 */
 
 import "bald:input"
-import "bald:draw"
 import "bald:sound"
 import "bald:utils"
 import "bald:utils/color"
 import "bald:utils/shape"
-
-import user "user:bald-user"
 
 import "core:log"
 import "core:fmt"
@@ -51,14 +48,8 @@ rect_size :: shape.rect_size
 Pivot :: utils.Pivot
 scale_from_pivot :: utils.scale_from_pivot // #cleanup, remove this
 
-// bald user stuff (this is cringe and will be yeeted soon)
-ZLayer :: user.ZLayer
-Quad_Flags :: user.Quad_Flags
-Sprite_Name :: user.Sprite_Name
-get_frame_count :: user.get_frame_count
-get_sprite_offset :: user.get_sprite_offset
 get_sprite_center_mass :: proc(img: Sprite_Name) -> Vec2 {
-	size := draw.get_sprite_size(img)
+	size := get_sprite_size(img)
 	
 	offset, pivot := get_sprite_offset(img)
 	
@@ -83,10 +74,10 @@ DEV :: #config(DEV, NOT_RELEASE)
 //
 // game spaces
 
-get_world_space :: proc() -> draw.Coord_Space {
+get_world_space :: proc() -> Coord_Space {
 	return {proj=get_world_space_proj(), camera=get_world_space_camera()}
 }
-get_screen_space :: proc() -> draw.Coord_Space {
+get_screen_space :: proc() -> Coord_Space {
 	return {proj=get_screen_space_proj(), camera=Matrix4(1)}
 }
 
@@ -268,8 +259,8 @@ raw_button :: proc(rect: Rect) -> (hover, pressed: bool) {
 }
 
 mouse_pos_in_current_space :: proc() -> Vec2 {
-	proj := draw.draw_frame.coord_space.proj
-	cam := draw.draw_frame.coord_space.camera
+	proj := draw_frame.coord_space.proj
+	cam := draw_frame.coord_space.camera
 	if proj == {} || cam == {} {
 		log.error("not in a space, need to push_coord_space first")
 	}

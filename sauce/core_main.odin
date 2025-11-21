@@ -22,7 +22,6 @@ and is highly tangled with game state.
 
 import "bald:sound"
 import "bald:utils"
-import "bald:draw"
 import "bald:input"
 import "bald:utils/shape"
 import "bald:utils/logger"
@@ -102,7 +101,7 @@ core_app_init :: proc "c" () { // these sokol callbacks are c procs
 		window_h = height
 	}
 
-	draw.render_init()
+	render_init()
 
 	app_init()
 }
@@ -148,9 +147,9 @@ core_app_frame :: proc "c" () {
 		sapp.toggle_fullscreen()
 	}
 
-	draw.core_render_frame_start()
+	core_render_frame_start()
 	app_frame()
-	draw.core_render_frame_end()
+	core_render_frame_end()
 
 	input.reset_input_state(input.state)
 	free_all(context.temp_allocator)
