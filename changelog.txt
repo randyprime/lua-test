@@ -42,18 +42,5 @@ Moved core shader code into /draw, the shader.glsl is now just a pixel shader
 Added hash_storage, steamworks, & flat-array packages
 Cleaned up vector types, now just using standard Vec2, Vec3, Vec4
 
---- TODO :next
-
-
-
-maybe rethink how the get world space function works?
-we kinda want to hard code a get mouse pos in world space... maybe
-
-
-
-
-text wrapping
-
-simple main menu / UI demo
-
-line drawing
+--- v0.9
+Moved all core packages to be flat files so it's easier to make shit. This cleans up & simplifies the codebase a lot.
