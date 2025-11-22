@@ -1,16 +1,15 @@
-I haven't updated this in a while. But here's the changes:
-- I no longer use packages for stuff like /draw, /input, etc (this was a mistake trying to abstract it, it's easier when it's not a package)
+This entire repo is meant to be cloned and used as a starting point for a project.
 
----
+It's more of a template than a "game engine" that you use.
 
-This is practically my entire toolset that I use for no-engine game development.
+Modify and tear it apart as needed to fit the specific needs of whatever you're working on.
 
-I used the concepts in here to make these games:
+This is practically my entire toolset - being iterated on since 2018.
+
+Games shipped using the concepts in this template:
 - https://store.steampowered.com/app/2571560/ARCANA/
 - https://store.steampowered.com/app/3309460/Demon_Knives/
 - https://store.steampowered.com/app/3433610/Terrafactor/
-
-I've been iterating on these ideas for the last 5 years of learning how to program a game without an engine.
 
 Things are in various stages of completion, lots of TODOs thrown around, dumb performance bottlenecks, etc. But as it stands, it's about as production ready as I've been able to pull off so far.
 
@@ -23,21 +22,12 @@ I'll be updating this as I continue making games and learning new things.
 - Fully featured sound design via FMOD, with wrappers for making it feel extremely easy to program the actual sound playback hooks
 - Very tight Game_State and Entity structure that can be easily serialized
 
-## Coming One Day™️
-No idea on an ETA for these guys. It'll happen whenever it's actually needed.
-- Controller support
-- Custom backends for console support (switch, xbox, ps5)
-- 3D rendering package & pipeline
-
 # The Structure
 
-Overview of Packages in `/sauce/bald`
-- `/draw` cross platform high performance 2D sprite rendering via Sokol
-- `/sound` easy sound playback & design system via FMOD
-- `/input` simple input abstraction
-- `/utils/shape` simple shape abstraction for collisions
+## Core
+Any file with `core_` is the meat of the tooling and is more or less seperate from the game logic.
 
-^ In general, these packages are made to be easily upgradable and sharable across projects.
+I used to have these in standalone packages, but it's too annoying to enforce a clear boundary. Often you want to be able to access the entity structure or other game-specific stuff in the core.
 
 ## `main.odin`  
 This is the entrypoint and the structure of the main loop.
@@ -51,10 +41,6 @@ This is the file I spend 90% of my time in, adding in new content to whatever th
 
 ## `entity.odin`
 The backbone of the entity megastruct. As talked about [in here](https://randyprime.beehiiv.com/p/entity-structure-made-simple).
-
-## `bald_helpers.odin`
-This is the intersection of the `/bald` packages and all the game-specific stuff.
-
 
 # Building
 
@@ -86,13 +72,6 @@ Needs to run from the root directory since it's accessing /res.
 I'd recommend setting up the [RAD Debugger](https://github.com/EpicGamesExt/raddebugger) (windows-only) for a great running & debugging experience. I always launch my game directly from there so it's easier to catch bugs on the fly.
 
 # FAQ
-## How do I use this to make a game?
-I'm focusing my efforts on teaching people how to use this via [my paid program](https://learn.randy.gg/?src=template-starter).
-
-If you're on a budget, here's some free alternatives:
-- I do [live streams](https://www.youtube.com/@randyprime2) of development while using this
-- I make educational content for this on [my YT channel](https://www.youtube.com/@randyprime)
-
 ## Why is this a "blueprint" (not a library)?
 Game development is complicated.
 
@@ -109,9 +88,9 @@ new way:
 3. learn the fundamental thing it's doing, then build on top of it, adjusting the source
 4. (optional) open an issue so I can consider integrating it into the blueprint
 
-> The most common example is you'll have something you want to do with the rendering. So you go off an learn graphics programming using [this](https://learnopengl.com/), maybe rewriting your own version of `/draw`, or just adjusting it to do the thing you need. (Render textures, adjusting the Vertex data, multi-stage draw passes and post-processing, etc)
+> The most common example is you'll have something you want to do with the rendering. So you go off an learn graphics programming using [this](https://learnopengl.com/), maybe rewriting your own version of `core_render`, or just adjusting it to do the thing you need. (Render textures, adjusting the Vertex data, multi-stage draw passes and post-processing, etc)
 
-I tried my best to seperate the core layer `/bald` from the game specific stuff so it's easy to upgrade later on, but there's what I believe to be an unavoidable tangling of some ideas in a lot of places.
+I tried my best to seperate the core stuff from the game specific stuff so it's easy to upgrade later on, but there's what I believe to be an unavoidable tangling of some ideas in a lot of places.
 
 I'll continue trying to simplify this and make it as readable and usable as possible, without sacrificing the full production-ready power of it.
 
@@ -123,6 +102,6 @@ Compared to Jai, it has more users and is public (Jai is still in a closed beta)
 ## Why Sokol?
 It feels like a nice sweet spot high and low level.
 
-It's not as high level as something like Raylib, so there's more flexibility with what you can do. But to use it, you need to learn graphics programming. And that kinda sucks for beginners. That's why I've built this blueprint. It's kinda like an all-in-one production ready suite, where you can opt-in to the finer details without changing your end gameplay programming workflow.
+It's not as high level as something like Raylib, so there's more flexibility with what you can do.
 
-But it's not as low level as something like just manually writing win32 code & raw directx11 to get a triangle drawing on the screen.
+But usually to use Sokol you need to learn graphics programming, and usually there's a lot of boilerplate involved. That's why I've built this blueprint.
