@@ -8,6 +8,7 @@ GAMEPLAY O'CLOCK MEGAFILE
 */
 
 import "utils"
+import "utils/shape"
 import "utils/color"
 
 import "core:log"
@@ -96,7 +97,7 @@ Entity :: struct {
 	last_known_x_dir: f32,
 	flip_x: bool,
 	draw_offset: Vec2,
-	draw_pivot: Pivot,
+	draw_pivot: utils.Pivot,
 	rotation: f32,
 	hit_flash: Vec4,
 	sprite: Sprite_Name,
@@ -130,6 +131,86 @@ entity_setup :: proc(e: ^Entity, kind: Entity_Kind) {
 }
 
 //
+// game :draw related things
+
+Quad_Flags :: enum u8 {
+	// #shared with the shader.glsl definition
+	background_pixels = (1<<0),
+	flag2 = (1<<1),
+	flag3 = (1<<2),
+}
+
+ZLayer :: enum u8 {
+	// Can add as many layers as you want in here.
+	// Quads get sorted and drawn lowest to highest.
+	// When things are on the same layer, they follow normal call order.
+	nil,
+	background,
+	shadow,
+	playspace,
+	vfx,
+	ui,
+	tooltip,
+	pause_menu,
+	top,
+}
+
+Sprite_Name :: enum {
+	nil,
+	bald_logo,
+	fmod_logo,
+	player_still,
+	shadow_medium,
+	bg_repeat_tex0,
+	player_death,
+	player_run,
+	player_idle,
+	// to add new sprites, just put the .png in the res/images folder
+	// and add the name to the enum here
+	//
+	// we could auto-gen this based on all the .png's in the images folder
+	// but I don't really see the point right now. It's not hard to type lol.
+}
+
+sprite_data: [Sprite_Name]Sprite_Data = #partial {
+	.player_idle = {frame_count=2},
+	.player_run = {frame_count=3}
+}
+
+Sprite_Data :: struct {
+	frame_count: int,
+	offset: Vec2,
+	pivot: utils.Pivot,
+}
+
+get_sprite_offset :: proc(img: Sprite_Name) -> (offset: Vec2, pivot: utils.Pivot) {
+	data := sprite_data[img]
+	offset = data.offset
+	pivot = data.pivot
+	return
+}
+
+// #cleanup todo, this is kinda yuckie living in the bald-user
+get_frame_count :: proc(sprite: Sprite_Name) -> int {
+	frame_count := sprite_data[sprite].frame_count
+	if frame_count == 0 {
+		frame_count = 1
+	}
+	return frame_count
+}
+
+get_sprite_center_mass :: proc(img: Sprite_Name) -> Vec2 {
+	size := get_sprite_size(img)
+	
+	offset, pivot := get_sprite_offset(img)
+	
+	center := size * utils.scale_from_pivot(pivot)
+	center -= offset
+	
+	return center
+}
+
+//
 // main game procs
 
 app_init :: proc() {
@@ -148,7 +229,7 @@ app_frame :: proc() {
 		x, y := screen_pivot(.top_left)
 		x += 2
 		y -= 2
-		draw_text({x, y}, "hello world.", z_layer=.ui, pivot=Pivot.top_left)
+		draw_text({x, y}, "hello world.", z_layer=.ui, pivot=utils.Pivot.top_left)
 	}
 
 	sound_play_continuously("event:/ambiance", "")
@@ -230,7 +311,7 @@ game_draw :: proc() {
 		push_coord_space({proj=Matrix4(1), camera=Matrix4(1)})
 
 		// draw rect that covers the whole screen
-		draw_rect(Rect{ -1, -1, 1, 1}, flags=.background_pixels) // we leave it in the hands of the shader
+		draw_rect(shape.Rect{ -1, -1, 1, 1}, flags=.background_pixels) // we leave it in the hands of the shader
 	}
 
 	// world
@@ -240,7 +321,7 @@ game_draw :: proc() {
 		draw_sprite({10, 10}, .player_still, col_override=Vec4{1,0,0,0.4})
 		draw_sprite({-10, 10}, .player_still)
 
-		draw_text({0, -50}, "sugon", pivot=.bottom_center, col={0,0,0,0.1})
+		draw_text({0, -50}, "sugon", pivot=.bottom_center, col={0,0,0,0.1}, drop_shadow_col={})
 
 		for handle in get_all_ents() {
 			e := entity_from_handle(handle)

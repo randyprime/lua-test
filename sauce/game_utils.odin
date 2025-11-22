@@ -2,16 +2,9 @@ package main
 
 /*
 
-bald_helpers_v1
+This is mostly just a random collection of utility functions that are likely shared across games.
 
-These are functions that should (for the most part) be shared across games.
-
-I put them in here so it's easier to update to newer versions and share it across codebases.
-
-They don't live inside any package though because they're very intertwined with the main game layer.
-(like using game state, entities, etc)
-
-Consider this like the bald/utils package, but for stuff tangled with the game.
+Funcitons here can't live in the actual `utils` package because they interface with game-specific state. 
 
 */
 
@@ -33,29 +26,6 @@ Vec3 :: [3]f32
 Vec4 :: [4]f32
 Matrix4 :: linalg.Matrix4f32;
 Vec2i :: [2]int
-
-// shape package
-Shape :: shape.Shape
-Rect :: shape.Rect
-Circle :: shape.Circle
-// #cleanup todo, remove these. it's not that much extra typing. It's only really worth it on the types.
-rect_make :: shape.rect_make
-rect_size :: shape.rect_size
-
-// utils package
-Pivot :: utils.Pivot
-scale_from_pivot :: utils.scale_from_pivot // #cleanup, remove this
-
-get_sprite_center_mass :: proc(img: Sprite_Name) -> Vec2 {
-	size := get_sprite_size(img)
-	
-	offset, pivot := get_sprite_offset(img)
-	
-	center := size * scale_from_pivot(pivot)
-	center -= offset
-	
-	return center
-}
 
 //
 // constant compile-tile flags for target specific logic
@@ -105,7 +75,7 @@ get_screen_space_proj :: proc() -> Matrix4 {
 }
 
 //
-// action input #action_system
+// action input
 
 is_action_pressed :: proc(action: Input_Action) -> bool {
 	key := key_from_action(action)
@@ -151,32 +121,6 @@ get_input_vector :: proc() -> Vec2 {
 }
 
 //
-// context structure
-
-// this is defined in the main.odin since it varies from game to game
-
-/*
-this is basically just Odin's context, but our own so it's easy to
-access global data deep in the callstack.
-
-It helps with doing a more complex fixed update timestep where you're
-doing a sim to predict the draw frame on some temporary game state.
-
-If the entire game.odin is written so that it's using data from here, it
-becomes trivial to swap in whatever is needed.
-*/
-
-// useful for doing a push_ctx and setting values for a scope
-// and having it auto-pop to the original once the scope ends
-set_ctx :: proc(_ctx: Core_Context) {
-	ctx = _ctx
-}
-@(deferred_out=set_ctx)
-push_ctx :: proc() -> Core_Context {
-	return ctx
-}
-
-//
 // timing utilities
 
 app_now :: utils.seconds_since_init
@@ -197,12 +141,12 @@ time_since :: proc(time: f64) -> f32 {
 //
 // UI
 
-screen_pivot_v2 :: proc(pivot: Pivot) -> Vec2 {
+screen_pivot_v2 :: proc(pivot: utils.Pivot) -> Vec2 {
 	x,y := screen_pivot(pivot)
 	return Vec2{x,y}
 }
 
-screen_pivot :: proc(pivot: Pivot) -> (x, y: f32) {
+screen_pivot :: proc(pivot: utils.Pivot) -> (x, y: f32) {
 	#partial switch(pivot) {
 		case .top_left:
 		x = 0
@@ -246,7 +190,7 @@ screen_pivot :: proc(pivot: Pivot) -> (x, y: f32) {
 	return
 }
 
-raw_button :: proc(rect: Rect) -> (hover, pressed: bool) {
+raw_button :: proc(rect: shape.Rect) -> (hover, pressed: bool) {
 	mouse_pos := mouse_pos_in_current_space()
 	hover = shape.rect_contains(rect, mouse_pos)
 	if hover && key_pressed(.LEFT_MOUSE) {
@@ -277,11 +221,4 @@ mouse_pos_in_current_space :: proc() -> Vec2 {
 	mouse_world = cam * mouse_world
 	
 	return mouse_world.xy
-}
-
-//
-// SOUND
-
-emit_sound_from_entity :: proc(event_name: string, e: ^Entity) {
-	sound_play_continuously(event_name, fmt.tprint(e.handle.id), e.pos)
 }

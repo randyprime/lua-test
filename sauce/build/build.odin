@@ -78,7 +78,7 @@ main :: proc() {
 	
 	// generate the shader
 	// docs: https://github.com/floooh/sokol-tools/blob/master/docs/sokol-shdc.md
-	utils.fire("sokol-shdc", "-i", "sauce/shader_core.glsl", "-o", "sauce/generated_shader.odin", "-l", "hlsl5:metal_macos", "-f", "sokol_odin")
+	utils.fire("sokol-shdc", "-i", "sauce/shader.glsl", "-o", "sauce/generated_shader.odin", "-l", "hlsl5:metal_macos", "-f", "sokol_odin")
 
 	wd := os.get_current_directory()
 

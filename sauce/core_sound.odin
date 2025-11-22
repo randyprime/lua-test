@@ -185,6 +185,10 @@ sound_play_continuously :: proc(name: string, unique_id: string, pos := INVALID_
 	
 }
 
+emit_sound_from_entity :: proc(event_name: string, e: ^Entity) {
+	sound_play_continuously(event_name, fmt.tprint(e.handle.id), e.pos)
+}
+
 sound_stop :: proc(event: ^fstudio.EVENTINSTANCE) -> bool {
 	using state, fstudio
 	ok := EventInstance_Stop(event, .STOP_ALLOWFADEOUT)

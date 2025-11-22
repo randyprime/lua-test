@@ -35,6 +35,14 @@ Core_Context :: struct {
 }
 ctx: Core_Context
 
+set_ctx :: proc(_ctx: Core_Context) {
+	ctx = _ctx
+}
+@(deferred_out=set_ctx)
+push_ctx :: proc() -> Core_Context {
+	return ctx
+}
+
 //
 // MAIN
 
