@@ -27,6 +27,7 @@ EXE_NAME :: "game"
 Target :: enum {
 	windows,
 	mac,
+	linux,
 }
 
 main :: proc() {
@@ -38,13 +39,18 @@ main :: proc() {
 	start_time := time.now()
 
 	// note, ODIN_OS is built in, but we're being explicit
-	assert(ODIN_OS == .Windows || ODIN_OS == .Darwin, "unsupported OS target")
+	assert(ODIN_OS == .Windows || ODIN_OS == .Darwin || ODIN_OS == .Linux, "unsupported OS target")
 
 	target: Target
 	#partial switch ODIN_OS {
-		case .Windows: target = .windows
-		case .Darwin: target = .mac
-		case: {
+	case .Windows:
+		target = .windows
+	case .Darwin:
+		target = .mac
+	case .Linux:
+		target = .linux
+	case:
+		{
 			log.error("Unsupported os:", ODIN_OS)
 			return
 		}
@@ -60,7 +66,7 @@ main :: proc() {
 			fmt.eprintln("Error:", err)
 		}
 		defer os.close(f)
-		
+
 		using fmt
 		fprintln(f, "//")
 		fprintln(f, "// MACHINE GENERATED via build.odin")
@@ -72,25 +78,55 @@ main :: proc() {
 		fprintln(f, "Platform :: enum {")
 		fprintln(f, "	windows,")
 		fprintln(f, "	mac,")
+		fprintln(f, "	linux,")
 		fprintln(f, "}")
 		fprintln(f, tprintf("PLATFORM :: Platform.%v", target))
 	}
-	
+
 	// generate the shader
 	// docs: https://github.com/floooh/sokol-tools/blob/master/docs/sokol-shdc.md
-	utils.fire("sokol-shdc", "-i", "sauce/shader.glsl", "-o", "sauce/generated_shader.odin", "-l", "hlsl5:metal_macos", "-f", "sokol_odin")
+
+	shader_backend: string
+	shdc_dir: string
+	switch target {
+	case .windows:
+		shdc_dir = "sokol-shdc-win.exe"
+		shader_backend = "hlsl5"
+	case .mac:
+		shdc_dir = "sokol-shdc-mac"
+		shader_backend = "metal_macos"
+	case .linux:
+		shdc_dir = "sokol-shdc-linux"
+		shader_backend = "glsl430"
+	}
+
+	utils.fire(
+		shdc_dir,
+		"-i",
+		"sauce/shader.glsl",
+		"-o",
+		"sauce/generated_shader.odin",
+		"-l",
+		shader_backend,
+		"-f",
+		"sokol_odin",
+	)
 
 	wd := os.get_current_directory()
 
 	//utils.make_directory_if_not_exist("build")
-	
-	out_dir : string
+
+	out_dir: string
 	switch target {
-		case .windows: out_dir = "build/windows_debug"
-		case .mac: out_dir = "build/mac_debug"
+	case .windows:
+		out_dir = "build/windows_debug"
+	case .mac:
+		out_dir = "build/mac_debug"
+	case .linux:
+		out_dir = "build/linux_debug"
 	}
 
-	full_out_dir_path := fmt.tprintf("%v/%v", wd, out_dir)
+	full_out_dir_path := path.join({wd, out_dir})
 	log.info(full_out_dir_path)
 	utils.make_directory_if_not_exist(full_out_dir_path)
 
@@ -101,7 +137,7 @@ main :: proc() {
 			"build",
 			"sauce",
 			"-debug",
-			fmt.tprintf("-out:%v/%v.exe", out_dir, EXE_NAME),
+			fmt.tprintf("-out:%v", path.join({out_dir, EXE_NAME})),
 		}
 		// not needed, it's easier to just generate code into generated.odin
 		//append(&c, fmt.tprintf("-define:TARGET_STRING=%v", target))
@@ -114,17 +150,19 @@ main :: proc() {
 		files_to_copy: [dynamic]string
 
 		switch target {
-			case .windows:
+		case .windows:
 			append(&files_to_copy, "sauce/fmod/studio/lib/windows/x64/fmodstudio.dll")
 			append(&files_to_copy, "sauce/fmod/studio/lib/windows/x64/fmodstudioL.dll")
 			append(&files_to_copy, "sauce/fmod/core/lib/windows/x64/fmod.dll")
 			append(&files_to_copy, "sauce/fmod/core/lib/windows/x64/fmodL.dll")
 
-			case .mac:
+		case .mac:
 			append(&files_to_copy, "sauce/fmod/studio/lib/darwin/libfmodstudio.dylib")
 			append(&files_to_copy, "sauce/fmod/studio/lib/darwin/libfmodstudioL.dylib")
 			append(&files_to_copy, "sauce/fmod/core/lib/darwin/libfmod.dylib")
 			append(&files_to_copy, "sauce/fmod/core/lib/darwin/libfmodL.dylib")
+		case .linux:
+		//TODO: linux fmod support
 		}
 
 		for src in files_to_copy {
