@@ -1,15 +1,12 @@
+**Want help using this to make a game? Join the [free community](https://www.skool.com/dev-fellowship-8002)**
+
+---
+
 This entire repo is meant to be cloned and used as a starting point for a project.
 
-It's more of a template than a "game engine" that you use.
+It's more of a template than a "game engine" that you use. Modify and tear it apart as needed to fit the specific needs of whatever you're working on.
 
-Modify and tear it apart as needed to fit the specific needs of whatever you're working on.
-
-This is practically my entire toolset - being iterated on since 2018.
-
-Games shipped using the concepts in this template:
-- https://store.steampowered.com/app/2571560/ARCANA/
-- https://store.steampowered.com/app/3309460/Demon_Knives/
-- https://store.steampowered.com/app/3433610/Terrafactor/
+This is practically my entire toolset - being iterated on since 2018. It's what [Terrafactor](https://store.steampowered.com/app/3433610/Terrafactor/) runs on.
 
 Things are in various stages of completion, lots of TODOs thrown around, dumb performance bottlenecks, etc. But as it stands, it's about as production ready as I've been able to pull off so far.
 
@@ -18,9 +15,8 @@ I'll be updating this as I continue making games and learning new things.
 # Features
 - Very fast pixel art asset creation & iteration pipeline with Aseprite via `asset_workbench/aseprite_asset_export.lua`
 - Shaders with a rendering system that can be completely overhauled to suit whatever VFX you need
-- A single-function entity gameplay programming workflow that scales well
-- Fully featured sound design via FMOD, with wrappers for making it feel extremely easy to program the actual sound playback hooks
-- Very tight Game_State and Entity structure that can be easily serialized
+- A dead simple entity gameplay programming "ECS"
+- Fully featured sound design via FMOD with beautiful playback helpers
 
 # The Structure
 
