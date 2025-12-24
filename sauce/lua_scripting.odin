@@ -192,8 +192,25 @@ spawn_lua_entity :: proc(script_name: string) -> ^Entity {
 	
 	log.infof("Spawning Lua entity from script: %s", script_name)
 	
-	// Create the entity
-	entity := entity_create(.lua_scripted)
+	// Create the raw entity structure
+	index:= -1
+	if len(ctx.gs.entity_free_list) > 0 {
+		index = pop(&ctx.gs.entity_free_list)
+	}
+
+	if index == -1 {
+		assert(ctx.gs.entity_top_count+1 < MAX_ENTITIES, "ran out of entities, increase size")
+		ctx.gs.entity_top_count += 1
+		index = ctx.gs.entity_top_count
+	}
+
+	entity := &ctx.gs.entities[index]
+	entity.handle.index = index
+	entity.handle.id = ctx.gs.latest_entity_id + 1
+	ctx.gs.latest_entity_id = entity.handle.id
+	
+	// Setup function pointers
+	entity_setup(entity)
 	
 	// Get the script table from the registry
 	lua.rawgeti(lua_state, lua.REGISTRYINDEX, lua.Integer(script_ref))
@@ -232,7 +249,52 @@ spawn_lua_entity :: proc(script_name: string) -> ^Entity {
 	
 	log.infof("Spawned Lua entity from '%s' (instance ref: %d)", script_name, ref)
 	
+	// Call optional init function if it exists
+	lua_call_entity_init(entity)
+	
 	return entity
+}
+
+// Call the init function for a Lua entity (called once on spawn)
+lua_call_entity_init :: proc(entity: ^Entity) {
+	if lua_state == nil || entity.lua_data_ref == 0 {
+		return
+	}
+	
+	// Push the entity table onto the stack
+	lua.rawgeti(lua_state, lua.REGISTRYINDEX, lua.Integer(entity.lua_data_ref))
+	
+	if !lua.istable(lua_state, -1) {
+		log.error("Invalid Lua entity reference")
+		lua.pop(lua_state, 1)
+		return
+	}
+	
+	// Set the current entity so API functions can access it
+	lua.pushlightuserdata(lua_state, entity)
+	lua.setglobal(lua_state, LUA_CURRENT_ENTITY)
+	
+	// Get the init function from the table
+	lua.getfield(lua_state, -1, "init")
+	
+	if !lua.isfunction(lua_state, -1) {
+		// No init function, that's okay
+		lua.pop(lua_state, 2)
+		return
+	}
+	
+	// Push self (the entity table) as first argument
+	lua.pushvalue(lua_state, -2)
+	
+	// Call entity:init()
+	if lua.pcall(lua_state, 1, 0, 0) != 0 {
+		error_msg := lua.tostring(lua_state, -1)
+		log.errorf("Error calling Lua entity init: %s", error_msg)
+		lua.pop(lua_state, 1)
+	}
+	
+	// Clean up
+	lua.pop(lua_state, 1) // Pop the entity table
 }
 
 // Call the update function for a Lua entity

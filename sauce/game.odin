@@ -88,15 +88,14 @@ Input_Action :: enum u8 {
 
 Entity :: struct {
 	handle: Entity_Handle,
-	kind: Entity_Kind,
 
-	// todo, move this into static entity data
+	// Function pointers for update and draw (set once, not serialized)
 	update_proc: proc(^Entity) `cbor:"-"`,
 	draw_proc: proc(Entity) `cbor:"-"`,
 
-	// Lua scripting support
-	is_lua_entity: bool,
-	lua_data_ref: int, // Reference to Lua table in registry
+	// Lua scripting support - all entities are Lua-based now
+	is_lua_entity: bool `cbor:"-"`, // Set during restoration, not serialized
+	lua_data_ref: int `cbor:"-"`, // Reference to Lua table in registry (only valid in current session)
 	lua_script_name: string, // Name of the Lua script this entity was spawned from
 
 	// big sloppy entity state dump.
@@ -120,24 +119,17 @@ Entity :: struct {
 	}
 }
 
-Entity_Kind :: enum {
-	nil,
-	player,
-	thing1,
-	lua_scripted,
-}
-
-entity_setup :: proc(e: ^Entity, kind: Entity_Kind) {
-	// entity defaults
+// Minimal entity setup - just sets function pointers
+entity_setup :: proc(e: ^Entity) {
+	// Set default function pointers for all entities
 	e.draw_proc = draw_entity_default
 	e.draw_pivot = .bottom_center
-
-	switch kind {
-		case .nil:
-		case .player: setup_player(e)
-		case .thing1: setup_thing1(e)
-		case .lua_scripted: setup_lua_entity(e)
+	
+	// All entities use Lua-based update
+	e.update_proc = proc(e: ^Entity) {
+		lua_call_entity_update(e)
 	}
+	e.is_lua_entity = true
 }
 
 //
@@ -270,21 +262,22 @@ game_update :: proc() {
 
 	// setup world for first game tick
 	if ctx.gs.ticks == 0 {
-		player := entity_create(.player)
+		// All entities are now Lua-based, spawned via script names
+		log.info("Spawning entities...")
+		
+		// Player
+		player := entity_create("player")
 		ctx.gs.player_handle = player.handle
 		
-		// Spawn Lua entities for testing save/load
-		log.info("Spawning Lua entities...")
-		
 		// Wanderer - tests timer and direction state
-		wanderer := spawn_lua_entity("wanderer")
+		wanderer := entity_create("wanderer")
 		if wanderer != nil {
 			wanderer.pos = {-60, 0}
 			log.info("Spawned wanderer entity (left)")
 		}
 		
 		// Spinner - tests time accumulation and continuous state
-		spinner := spawn_lua_entity("spinner")
+		spinner := entity_create("spinner")
 		if spinner != nil {
 			spinner.pos = {60, 0}
 			log.info("Spawned spinner entity (right)")
@@ -438,54 +431,6 @@ get_player :: proc() -> ^Entity {
 	return entity_from_handle(ctx.gs.player_handle)
 }
 
-setup_player :: proc(e: ^Entity) {
-	e.kind = .player
-
-	// this offset is to take it from the bottom center of the aseprite document
-	// and center it at the feet
-	e.draw_offset = Vec2{0.5, 5}
-	e.draw_pivot = .bottom_center
-
-	e.update_proc = proc(e: ^Entity) {
-
-		input_dir := get_input_vector()
-		e.pos += input_dir * 100.0 * ctx.delta_t
-
-		if input_dir.x != 0 {
-			e.last_known_x_dir = input_dir.x
-		}
-
-		e.flip_x = e.last_known_x_dir < 0
-
-		if input_dir == {} {
-			entity_set_animation(e, .player_idle, 0.3)
-		} else {
-			entity_set_animation(e, .player_run, 0.1)
-		}
-
-		e.scratch.col_override = Vec4{0,0,1,0.2}
-	}
-
-	e.draw_proc = proc(e: Entity) {
-		draw_sprite(e.pos, .shadow_medium, col={1,1,1,0.2})
-		draw_entity_default(e)
-	}
-}
-
-setup_thing1 :: proc(using e: ^Entity) {
-	kind = .thing1
-}
-
-setup_lua_entity :: proc(e: ^Entity) {
-	e.kind = .lua_scripted
-	e.is_lua_entity = true
-	
-	// Lua entities use a scripted update proc
-	e.update_proc = proc(e: ^Entity) {
-		lua_call_entity_update(e)
-	}
-}
-
 entity_set_animation :: proc(e: ^Entity, sprite: Sprite_Name, frame_duration: f32, looping:=true) {
 	if e.sprite != sprite {
 		e.sprite = sprite
@@ -533,7 +478,7 @@ update_entity_animation :: proc(e: ^Entity) {
 // Serializable game state that can be saved to disk
 Game_State_Save :: struct {
 	gs: Game_State,
-	lua_entity_data: map[int]Lua_Entity_Save_Data, // Maps entity index to Lua data
+	lua_entity_data: map[string]Lua_Entity_Save_Data, // Maps entity index (as string) to Lua data
 }
 
 save_game_to_disk :: proc() {
@@ -545,7 +490,7 @@ save_game_to_disk :: proc() {
 	save_data := new(Game_State_Save, context.temp_allocator)
 	
 	save_data.gs = ctx.gs^
-	save_data.lua_entity_data = make(map[int]Lua_Entity_Save_Data, allocator = context.temp_allocator)
+	save_data.lua_entity_data = make(map[string]Lua_Entity_Save_Data, allocator = context.temp_allocator)
 	
 	// Extract Lua entity data
 	for &e, idx in ctx.gs.entities {
@@ -553,7 +498,8 @@ save_game_to_disk :: proc() {
 		
 		if e.is_lua_entity && e.lua_data_ref != 0 {
 			lua_data := lua_extract_entity_data(&e)
-			save_data.lua_entity_data[idx] = lua_data
+			idx_key := fmt.tprintf("%d", idx) // Convert index to string for CBOR compatibility
+			save_data.lua_entity_data[idx_key] = lua_data
 		}
 	}
 	
@@ -599,55 +545,55 @@ load_game_from_disk :: proc() {
 	// Restore game state
 	ctx.gs^ = save_data.gs
 	
-	// Restore Lua entity data
+	// Restore Lua entity data and function pointers
 	for &e, idx in ctx.gs.entities {
 		if !is_valid(e) do continue
 		
-		if e.is_lua_entity {
-			// Lua entities need their references re-created
-			lua_data, has_lua_data := save_data.lua_entity_data[idx]
-			
-			if has_lua_data && lua_data.script_name != "" {
-				// Look up the script in the registry
-				script_ref, found := lua_script_registry[lua_data.script_name]
-				if !found {
-					log.errorf("Lua script '%s' not found when loading entity", lua_data.script_name)
-					continue
-				}
-				
-				// Get the script table from the registry
-				lua.rawgeti(lua_state, lua.REGISTRYINDEX, lua.Integer(script_ref))
-				
-				if !lua.istable(lua_state, -1) {
-					log.errorf("Invalid script reference for '%s'", lua_data.script_name)
-					lua.pop(lua_state, 1)
-					continue
-				}
-				
-				// Clone the script table for this entity instance
-				lua.newtable(lua_state) // Create new table for this instance
-				
-				// Copy all fields from the script table to the instance table
-				lua.pushnil(lua_state) // First key
-				for lua.next(lua_state, -3) != 0 {
-					lua.pushvalue(lua_state, -2) // Copy key
-					lua.pushvalue(lua_state, -2) // Copy value
-					lua.settable(lua_state, -5) // instance_table[key] = value
-					lua.pop(lua_state, 1) // Pop value, keep key for next iteration
-				}
-				
-				// Remove the script table, keep the instance table
-				lua.remove(lua_state, -2)
-				
-				// Store the instance table in the registry
-				ref := lua.L_ref(lua_state, lua.REGISTRYINDEX)
-				e.lua_data_ref = int(ref)
-				
-				// Restore the saved data into the Lua table
-				lua_restore_entity_data(&e, lua_data)
-				
-				log.infof("Restored Lua entity '%s' at index %d", lua_data.script_name, idx)
+		// Check if this entity has Lua data to restore (convert index to string key)
+		idx_key := fmt.tprintf("%d", idx)
+		lua_data, has_lua_data := save_data.lua_entity_data[idx_key]
+		
+		if has_lua_data && lua_data.script_name != "" {
+			// Look up the script in the registry
+			script_ref, found := lua_script_registry[lua_data.script_name]
+			if !found {
+				log.errorf("Lua script '%s' not found when loading entity", lua_data.script_name)
+				continue
 			}
+			
+			// Get the script table from the registry
+			lua.rawgeti(lua_state, lua.REGISTRYINDEX, lua.Integer(script_ref))
+			
+			if !lua.istable(lua_state, -1) {
+				log.errorf("Invalid script reference for '%s'", lua_data.script_name)
+				lua.pop(lua_state, 1)
+				continue
+			}
+			
+			// Clone the script table for this entity instance
+			lua.newtable(lua_state) // Create new table for this instance
+			
+			// Copy all fields from the script table to the instance table
+			lua.pushnil(lua_state) // First key
+			for lua.next(lua_state, -3) != 0 {
+				lua.pushvalue(lua_state, -2) // Copy key
+				lua.pushvalue(lua_state, -2) // Copy value
+				lua.settable(lua_state, -5) // instance_table[key] = value
+				lua.pop(lua_state, 1) // Pop value, keep key for next iteration
+			}
+			
+			// Remove the script table, keep the instance table
+			lua.remove(lua_state, -2)
+			
+			// Store the NEW instance table in the registry
+			ref := lua.L_ref(lua_state, lua.REGISTRYINDEX)
+			e.lua_data_ref = int(ref)
+			
+			// Restore the saved data into the Lua table
+			lua_restore_entity_data(&e, lua_data)
+			
+			// Set up function pointers now that Lua data is restored
+			entity_setup(&e)
 		}
 	}
 	

@@ -1,9 +1,9 @@
 // raddbg 0.9.24 project file
 
 recent_file: path: "sauce/game.odin"
+recent_file: path: "sauce/lua_scripting.odin"
 recent_file: path: "sauce/utils/logger/logger.odin"
 recent_file: path: "sauce/lua_api_helpers.odin"
-recent_file: path: "sauce/lua_scripting.odin"
 target:
 {
   executable: "build/windows_debug/game.exe"
@@ -13,5 +13,5 @@ target:
 debug_info:
 {
   path: "C:/rando/dev/lua-test/build/windows_debug/game.pdb"
-  timestamp: 66201984028072
+  timestamp: 66201986200482
 }

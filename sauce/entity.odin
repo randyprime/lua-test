@@ -44,7 +44,7 @@ entity_is_valid_ptr :: proc(entity: ^Entity) -> bool {
 
 entity_init_core :: proc() {
 	// make sure the zero entity has good defaults, so we don't crash on stuff like functions pointers
-	entity_setup(&zero_entity, .nil)
+	entity_setup(&zero_entity)
 }
 
 entity_from_handle :: proc(handle: Entity_Handle) -> (entity: ^Entity, ok:bool) #optional_ok {
@@ -60,28 +60,9 @@ entity_from_handle :: proc(handle: Entity_Handle) -> (entity: ^Entity, ok:bool) 
 	return ent, true
 }
 
-entity_create :: proc(kind: Entity_Kind) -> ^Entity {
-
-	index:= -1
-	if len(ctx.gs.entity_free_list) > 0 {
-		index = pop(&ctx.gs.entity_free_list)
-	}
-
-	if index == -1 {
-		assert(ctx.gs.entity_top_count+1 < MAX_ENTITIES, "ran out of entities, increase size")
-		ctx.gs.entity_top_count += 1
-		index = ctx.gs.entity_top_count
-	}
-
-	ent := &ctx.gs.entities[index]
-	ent.handle.index = index
-	ent.handle.id = ctx.gs.latest_entity_id + 1
-	ctx.gs.latest_entity_id = ent.handle.id
-
-	entity_setup(ent, kind)
-	fmt.assertf(ent.kind != nil, "entity %v needs to define a kind during setup", kind)
-
-	return ent
+entity_create :: proc(script_name: string) -> ^Entity {
+	// Simply forward to spawn_lua_entity which handles everything
+	return spawn_lua_entity(script_name)
 }
 
 entity_destroy :: proc(e: ^Entity) {
