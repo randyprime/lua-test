@@ -56,7 +56,8 @@ lua_api_get_pos :: proc "c" (L: ^lua.State) -> i32 {
 	context = runtime_context()
 	entity, ok := current_entity_or_nil(L)
 	if !ok do return 1
-	return GETTER_VEC2(L, entity.pos)
+	push_vec2(L, entity.pos)
+	return 1
 }
 
 // set_pos(x, y)
@@ -64,7 +65,10 @@ lua_api_set_pos :: proc "c" (L: ^lua.State) -> i32 {
 	context = runtime_context()
 	entity, ok := current_entity_or_nil(L)
 	if !ok do return 0
-	SETTER_VEC2(L, &entity.pos)
+	if check_args(L, 2) {
+		entity.pos.x = lua_to_f32(L, 1)
+		entity.pos.y = lua_to_f32(L, 2)
+	}
 	return 0
 }
 
@@ -73,7 +77,8 @@ lua_api_get_flip_x :: proc "c" (L: ^lua.State) -> i32 {
 	context = runtime_context()
 	entity, ok := current_entity_or_nil(L)
 	if !ok do return 1
-	return GETTER_BOOL(L, entity.flip_x)
+	push_bool(L, entity.flip_x)
+	return 1
 }
 
 // set_flip_x(bool)
@@ -81,7 +86,9 @@ lua_api_set_flip_x :: proc "c" (L: ^lua.State) -> i32 {
 	context = runtime_context()
 	entity, ok := current_entity_or_nil(L)
 	if !ok do return 0
-	SETTER_BOOL(L, &entity.flip_x)
+	if check_args(L, 1) {
+		entity.flip_x = lua_to_bool(L, 1)
+	}
 	return 0
 }
 
@@ -90,7 +97,8 @@ lua_api_get_rotation :: proc "c" (L: ^lua.State) -> i32 {
 	context = runtime_context()
 	entity, ok := current_entity_or_nil(L)
 	if !ok do return 1
-	return GETTER_F32(L, entity.rotation)
+	push_f32(L, entity.rotation)
+	return 1
 }
 
 // set_rotation(angle)
@@ -98,7 +106,9 @@ lua_api_set_rotation :: proc "c" (L: ^lua.State) -> i32 {
 	context = runtime_context()
 	entity, ok := current_entity_or_nil(L)
 	if !ok do return 0
-	SETTER_F32(L, &entity.rotation)
+	if check_args(L, 1) {
+		entity.rotation = lua_to_f32(L, 1)
+	}
 	return 0
 }
 
@@ -116,7 +126,7 @@ lua_api_set_animation :: proc "c" (L: ^lua.State) -> i32 {
 	frame_duration := lua_to_f32(L, 2)
 	loop := check_args(L, 3) ? lua_to_bool(L, 3) : true
 	
-	sprite, sprite_ok := string_to_sprite(sprite_name)
+	sprite, sprite_ok := string_to_enum(Sprite_Name, sprite_name)
 	if sprite_ok && sprite != .nil {
 		entity_set_animation(entity, sprite, frame_duration, loop)
 	}
@@ -130,7 +140,8 @@ lua_api_set_animation :: proc "c" (L: ^lua.State) -> i32 {
 lua_api_get_input_vector :: proc "c" (L: ^lua.State) -> i32 {
 	context = runtime_context()
 	input_dir := get_input_vector()
-	return GETTER_VEC2(L, input_dir)
+	push_vec2(L, input_dir)
+	return 1
 }
 
 // key_down(action_name) -> bool
@@ -143,14 +154,15 @@ lua_api_key_down :: proc "c" (L: ^lua.State) -> i32 {
 	}
 	
 	action_name := lua.tostring(L, 1)
-	action, ok := string_to_action(action_name)
+	action, ok := string_to_enum(Input_Action, action_name)
 	if !ok {
 		push_bool(L, false)
 		return 1
 	}
 	
 	result := is_action_down(action)
-	return GETTER_BOOL(L, result)
+	push_bool(L, result)
+	return 1
 }
 
 // key_pressed(action_name) -> bool
@@ -163,14 +175,15 @@ lua_api_key_pressed :: proc "c" (L: ^lua.State) -> i32 {
 	}
 	
 	action_name := lua.tostring(L, 1)
-	action, ok := string_to_action(action_name)
+	action, ok := string_to_enum(Input_Action, action_name)
 	if !ok {
 		push_bool(L, false)
 		return 1
 	}
 	
 	result := is_action_pressed(action)
-	return GETTER_BOOL(L, result)
+	push_bool(L, result)
+	return 1
 }
 
 // === Helper API ===
@@ -178,7 +191,8 @@ lua_api_key_pressed :: proc "c" (L: ^lua.State) -> i32 {
 // delta_time() -> number
 lua_api_delta_time :: proc "c" (L: ^lua.State) -> i32 {
 	context = runtime_context()
-	return GETTER_F32(L, ctx.delta_t)
+	push_f32(L, ctx.delta_t)
+	return 1
 }
 
 // game_time() -> number
