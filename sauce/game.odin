@@ -272,19 +272,19 @@ game_update :: proc() {
 		// Spawn Lua entities (optional - comment out if Lua isn't working)
 		log.info("Spawning Lua entities...")
 		
-		wanderer := load_lua_entity("res/scripts/wanderer.lua")
+		wanderer := spawn_lua_entity("wanderer")
 		if wanderer != nil {
 			wanderer.pos = {50, 0}
 			log.info("Spawned wanderer entity")
 		}
 		
-		spinner := load_lua_entity("res/scripts/spinner.lua")
+		spinner := spawn_lua_entity("spinner")
 		if spinner != nil {
 			spinner.pos = {-50, 0}
 			log.info("Spawned spinner entity")
 		}
 		
-		follower := load_lua_entity("res/scripts/player_follower.lua")
+		follower := spawn_lua_entity("player_follower")
 		if follower != nil {
 			follower.pos = {0, 30}
 			log.info("Spawned follower entity")

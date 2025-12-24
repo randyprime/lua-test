@@ -10,5 +10,5 @@ target:
 debug_info:
 {
   path: "C:/rando/dev/lua-test/build/windows_debug/game.pdb"
-  timestamp: 66201975035105
+  timestamp: 66201978187652
 }

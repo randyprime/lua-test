@@ -12,11 +12,16 @@ import "core:log"
 import "core:fmt"
 import "core:c"
 import "core:os"
+import "core:strings"
+import "core:path/filepath"
 import "base:runtime"
 import lua "vendor:lua/5.4"
 
 // Global Lua state
 lua_state: ^lua.State
+
+// Script registry: maps script name -> Lua registry reference
+lua_script_registry: map[string]int
 
 // Lua registry indices for entity references
 LUA_ENTITY_REGISTRY :: "ENTITY_REGISTRY"
@@ -40,12 +45,22 @@ lua_init :: proc() {
 	// Register our game API functions
 	register_lua_api()
 	
+	// Pre-load all Lua scripts
+	lua_preload_all_scripts("res/scripts")
+	
 	log.info("Lua scripting system initialized successfully")
 }
 
 // Shutdown Lua state
 lua_shutdown :: proc() {
 	if lua_state != nil {
+		// Clean up script registry
+		for name, ref in lua_script_registry {
+			lua.L_unref(lua_state, lua.REGISTRYINDEX, i32(ref))
+			delete(name) // Free the cloned string key
+		}
+		delete(lua_script_registry)
+		
 		lua.close(lua_state)
 		lua_state = nil
 	}
@@ -72,57 +87,149 @@ lua_allocator :: proc "c" (ud: rawptr, ptr: rawptr, osize, nsize: c.size_t) -> r
 	}
 }
 
-// Load a Lua entity script and create an entity from it
-load_lua_entity :: proc(script_path: string) -> ^Entity {
+// Pre-load all Lua scripts from a directory
+lua_preload_all_scripts :: proc(scripts_dir: string) {
+	if lua_state == nil {
+		log.error("Lua state not initialized - cannot preload scripts")
+		return
+	}
+	
+	// Initialize the registry map
+	lua_script_registry = make(map[string]int)
+	
+	log.infof("Pre-loading Lua scripts from: %s", scripts_dir)
+	
+	// Check if directory exists
+	if !os.exists(scripts_dir) {
+		log.warnf("Scripts directory not found: %s", scripts_dir)
+		return
+	}
+	
+	// Read directory contents
+	dir_handle, open_err := os.open(scripts_dir)
+	if open_err != 0 {
+		log.errorf("Failed to open scripts directory: %s", scripts_dir)
+		return
+	}
+	defer os.close(dir_handle)
+	
+	file_infos, read_err := os.read_dir(dir_handle, -1)
+	if read_err != 0 {
+		log.errorf("Failed to read scripts directory: %s", scripts_dir)
+		return
+	}
+	defer os.file_info_slice_delete(file_infos)
+	
+	// Load each .lua file
+	scripts_loaded := 0
+	for file_info in file_infos {
+		// Skip directories
+		if file_info.is_dir do continue
+		
+		// Only process .lua files
+		ext := filepath.ext(file_info.name)
+		if ext != ".lua" do continue
+		
+		// Get script name without extension
+		script_name := strings.trim_suffix(file_info.name, ".lua")
+		
+		// Build full path
+		script_path := filepath.join({scripts_dir, file_info.name})
+		defer delete(script_path)
+		
+		// Load and execute the script
+		cpath := fmt.ctprintf("%s", script_path)
+		load_result := lua.L_loadfile(lua_state, cpath)
+		if load_result != .OK {
+			error_msg := lua.tostring(lua_state, -1)
+			log.errorf("Failed to load Lua script '%s': %s", script_path, error_msg)
+			lua.pop(lua_state, 1)
+			continue
+		}
+		
+		// Execute the script (should return a table)
+		if lua.pcall(lua_state, 0, 1, 0) != 0 {
+			error_msg := lua.tostring(lua_state, -1)
+			log.errorf("Failed to execute Lua script '%s': %s", script_path, error_msg)
+			lua.pop(lua_state, 1)
+			continue
+		}
+		
+		// The script should return a table
+		if !lua.istable(lua_state, -1) {
+			log.errorf("Lua script '%s' did not return a table", script_path)
+			lua.pop(lua_state, 1)
+			continue
+		}
+		
+		// Store the script table in the registry
+		ref := lua.L_ref(lua_state, lua.REGISTRYINDEX)
+		lua_script_registry[strings.clone(script_name)] = int(ref)
+		
+		log.infof("Pre-loaded script '%s' (ref: %d)", script_name, ref)
+		scripts_loaded += 1
+	}
+	
+	log.infof("Successfully pre-loaded %d Lua script(s)", scripts_loaded)
+}
+
+// Spawn a Lua entity from a pre-loaded script
+spawn_lua_entity :: proc(script_name: string) -> ^Entity {
 	if lua_state == nil {
 		log.error("Lua state not initialized - call lua_init() first!")
 		return nil
 	}
 	
-	log.infof("Loading Lua entity from: %s", script_path)
-	
-	// Check if file exists first
-	if !os.exists(script_path) {
-		log.errorf("Lua script file not found: %s", script_path)
+	// Look up the script in the registry
+	script_ref, found := lua_script_registry[script_name]
+	if !found {
+		log.errorf("Lua script '%s' not found in registry. Available scripts:", script_name)
+		for name in lua_script_registry {
+			log.infof("  - %s", name)
+		}
 		return nil
 	}
 	
-	// Create the entity first
+	log.infof("Spawning Lua entity from script: %s", script_name)
+	
+	// Create the entity
 	entity := entity_create(.lua_scripted)
 	
-	// Load and execute the Lua script
-	cpath := fmt.ctprintf("%s", script_path)
-	load_result := lua.L_loadfile(lua_state, cpath)
-	if load_result != .OK {
-		error_msg := lua.tostring(lua_state, -1)
-		log.errorf("Failed to load Lua script '%s': %s (error code: %v)", script_path, error_msg, load_result)
-		lua.pop(lua_state, 1)
-		entity_destroy(entity)
-		return nil
-	}
+	// Get the script table from the registry
+	lua.rawgeti(lua_state, lua.REGISTRYINDEX, lua.Integer(script_ref))
 	
-	// Execute the script (should return a table)
-	if lua.pcall(lua_state, 0, 1, 0) != 0 {
-		error_msg := lua.tostring(lua_state, -1)
-		log.errorf("Failed to execute Lua script '%s': %s", script_path, error_msg)
-		lua.pop(lua_state, 1)
-		entity_destroy(entity)
-		return nil
-	}
-	
-	// The script should return a table with the entity definition
 	if !lua.istable(lua_state, -1) {
-		log.errorf("Lua script '%s' did not return a table", script_path)
+		log.errorf("Invalid script reference for '%s'", script_name)
 		lua.pop(lua_state, 1)
 		entity_destroy(entity)
 		return nil
 	}
 	
-	// Store the entity table in the registry with the entity's ID as the key
+	// Clone the script table for this entity instance
+	// This ensures each entity has its own copy of the data
+	lua.newtable(lua_state) // Create new table for this instance
+	
+	// Copy all fields from the script table to the instance table
+	lua.pushnil(lua_state) // First key
+	for lua.next(lua_state, -3) != 0 {
+		// Stack: script_table, instance_table, key, value
+		lua.pushvalue(lua_state, -2) // Copy key
+		lua.pushvalue(lua_state, -2) // Copy value
+		// Stack: script_table, instance_table, key, value, key, value
+		lua.settable(lua_state, -5) // instance_table[key] = value
+		// Stack: script_table, instance_table, key, value
+		lua.pop(lua_state, 1) // Pop value, keep key for next iteration
+	}
+	// Stack: script_table, instance_table
+	
+	// Remove the script table, keep the instance table
+	lua.remove(lua_state, -2)
+	
+	// Store the instance table in the registry
 	ref := lua.L_ref(lua_state, lua.REGISTRYINDEX)
 	entity.lua_data_ref = int(ref)
 	
-	log.infof("Loaded Lua entity from '%s' (ref: %d)", script_path, ref)
+	log.infof("Spawned Lua entity from '%s' (instance ref: %d)", script_name, ref)
 	
 	return entity
 }
