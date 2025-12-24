@@ -1,0 +1,14 @@
+// raddbg 0.9.24 project file
+
+recent_file: path: "sauce/lua_scripting.odin"
+target:
+{
+  executable: "build/windows_debug/game.exe"
+  working_directory: ""
+  enabled: 1
+}
+debug_info:
+{
+  path: "C:/rando/dev/lua-test/build/windows_debug/game.pdb"
+  timestamp: 66201975035105
+}
