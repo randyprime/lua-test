@@ -44,3 +44,6 @@ Cleaned up vector types, now just using standard Vec2, Vec3, Vec4
 
 --- v0.9
 Moved all core packages to be flat files so it's easier to make shit. This cleans up & simplifies the codebase a lot.
+
+--- v0.10 (in dev)
+Updated build to have constant switches for demo/playtest/full_game

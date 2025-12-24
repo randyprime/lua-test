@@ -2,6 +2,12 @@
 
 ---
 
+TODO:
+- current version untested on Linux + Mac
+- Linux FMOD support needs to be added
+
+---
+
 This entire repo is meant to be cloned and used as a starting point for a project.
 
 It's more of a template than a "game engine" that you use. Modify and tear it apart as needed to fit the specific needs of whatever you're working on.
