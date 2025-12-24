@@ -9,6 +9,9 @@ Like the build.odin for example.
 
 package utils
 
+import uuid "core:encoding/uuid"
+import "core:path/filepath"
+import "core:math/linalg/hlsl"
 import "core:os"
 import "core:os/os2"
 import "base:intrinsics"
@@ -45,11 +48,87 @@ Pivot :: enum {
 	top_right,
 }
 
+Justify_X :: enum {
+	left,
+	center,
+	right,
+}
+Justify_Y :: enum {
+	top,
+	center,
+	bottom,
+}
+
+Axis2 :: enum {
+	x,
+	y,
+}
+
+break_pivot_into_axes :: proc(pivot: Pivot) -> (x: Justify_X, y: Justify_Y) {
+	switch pivot {
+		case .bottom_left: return .left, .bottom
+		case .bottom_center: return .center, .bottom
+		case .bottom_right: return .right, .bottom
+		case .center_left: return .left, .center
+		case .center_center: return .center, .center
+		case .center_right: return .right, .center
+		case .top_left: return .left, .top
+		case .top_center: return .center, .top
+		case .top_right: return .right, .top
+	}
+
+	crash("uh oh")
+	return nil, nil
+}
+
+pivot_from_axes :: proc(x: Justify_X, y: Justify_Y) -> Pivot {
+	if y == .bottom && x == .center {
+		return .bottom_center
+	} else if y == .center && x == .center {
+		return .center_center
+	} else if y == .top && x == .center {
+		return .top_center
+	} else if y == .bottom && x == .left {
+		return .bottom_left
+	} else if y == .center && x == .left {
+		return .center_left
+	} else if y == .top && x == .left {
+		return .top_left
+	} else if y == .bottom && x == .right {
+		return .bottom_right
+	} else if y == .center && x == .right {
+		return .center_right
+	} else if y == .top && x == .right {
+		return .top_right
+	}
+
+	crash("invalid justify combination")
+	return .center_center
+}
+
 Direction :: enum {
 	north,
 	east,
 	south,
 	west,
+}
+
+inverse_direction :: proc(dir: Direction) -> Direction {
+	switch dir {
+		case .north: return .south
+		case .east: return .west
+		case .south: return .north
+		case .west: return .east
+	}
+
+	crash("this shouldn't be hit lol")
+	return .north
+}
+
+is_direction_parallel :: proc(a: Direction, b: Direction) -> bool {
+	a_dir := cardinal_direction_offset_enum(a)
+	b_dir := cardinal_direction_offset_enum(a)
+	return math.abs(a_dir.x) == math.abs(b_dir.x) && math.abs(a_dir.y) == math.abs(b_dir.y)
 }
 
 scale_from_pivot :: proc(pivot: Pivot) -> Vec2 {
@@ -71,8 +150,27 @@ vector_from_direction :: proc(dir: Direction) -> Vec2 {
 	return Vec2{ f32(cardinal_direction_offset(int(dir)).x), f32(cardinal_direction_offset(int(dir)).y) }
 }
 
+direction_from_vector :: proc(vec: Vec2) -> Direction {
+	if math.abs(vec.x) > math.abs(vec.y) {
+		// X component is dominant
+		return vec.x > 0 ? .east : .west
+	} else {
+		// Y component is dominant (or equal)
+		return vec.y > 0 ? .north : .south
+	}
+}
+
+cardinal_direction_offset :: proc {
+	cardinal_direction_offset_enum,
+	cardinal_direction_offset_int,
+}
+
+cardinal_direction_offset_enum :: proc(dir: Direction) -> Vec2i {
+	return cardinal_direction_offset_int(int(dir))
+}
+
 // takes in 0..<4 (0,1,2,3) will panic otherwise
-cardinal_direction_offset :: proc(i: int) -> Vec2i {
+cardinal_direction_offset_int :: proc(i: int) -> Vec2i {
 	switch i {
 		case 0: return {0, 1} // north
 		case 1: return {1, 0} // east
@@ -112,6 +210,25 @@ fire :: proc(cmd: ..string) -> os2.Error {
 	}
 
 	return nil
+}
+
+copy_directory :: proc(dest_dir: string, src_dir: string) {
+	file_infos, err := os2.read_all_directory_by_path(src_dir, context.temp_allocator)
+	if err != nil {
+		log.error(err)
+		return
+	}
+	make_directory_if_not_exist(dest_dir)
+	for fi in file_infos {
+		src_path := filepath.join({src_dir, fi.name}, context.temp_allocator)
+		dest_path := filepath.join({dest_dir, fi.name}, context.temp_allocator)
+
+		if fi.type == .Directory {
+			copy_directory(dest_path, src_path)
+		} else {
+			os2.copy_file(dest_path, src_path)
+		}
+	}
 }
 
 copy_dynamic_array :: proc(dest: ^$T/[dynamic]$E, src: T) {
@@ -219,10 +336,10 @@ animate_to_target_f32 :: proc(value: ^f32, target: f32, delta_t: f32, rate:f32= 
 	return false;
 }
 
-animate_to_target_v2 :: proc(value: ^Vec2, target: Vec2, delta_t: f32, rate :f32= 15.0, good_enough:f32= 0.001)
-{
-	animate_to_target_f32(&value.x, target.x, delta_t, rate, good_enough)
-	animate_to_target_f32(&value.y, target.y, delta_t, rate, good_enough)
+animate_to_target_v2 :: proc(value: ^Vec2, target: Vec2, delta_t: f32, rate :f32= 15.0, good_enough:f32= 0.001) -> bool {
+	x_reached := animate_to_target_f32(&value.x, target.x, delta_t, rate, good_enough)
+	y_reached := animate_to_target_f32(&value.y, target.y, delta_t, rate, good_enough)
+	return x_reached && y_reached
 }
 
 almost_equals :: proc(a: f32, b: f32, epsilon: f32 = 0.001) -> bool
@@ -280,8 +397,16 @@ angle_from_vector :: proc(v: Vec2) -> f32 {
 
 rand_f32_range :: rand.float32_range
 rand_f64_range :: rand.float64_range
+
+// pass in 5, and it'll give a range from 0 -> 5
+// max is inclusive
 rand_int :: proc(max: int) -> int {
 	return int(rand.int31_max(i32(max) + 1))
+}
+
+rand_int_range :: proc(min, max: int) -> int {
+	spread := max-min
+	return rand_int(spread)+min
 }
 
 pretty_calendar_time :: proc(t: time.Time) -> string {
@@ -333,4 +458,147 @@ seconds_since_init :: proc() -> f64 {
 		return 0
 	}
 	return duration_seconds(since(init_time))
+}
+
+rgb_to_hsv_vec4 :: proc(rgb: Vec4) -> Vec4 {
+	r, g, b, a := rgb[0], rgb[1], rgb[2], rgb[3]
+	
+	max_val := max(r, g, b)
+	min_val := min(r, g, b)
+	delta := max_val - min_val
+	
+	// Value (brightness)
+	v := max_val
+	
+	// Saturation
+	s: f32 = 0
+	if max_val != 0 {
+		s = delta / max_val
+	}
+	
+	// Hue
+	h: f32 = 0
+	if delta != 0 {
+		if max_val == r {
+			h = 60 * (((g - b) / delta) + (g < b ? 6 : 0))
+		} else if max_val == g {
+			h = 60 * (((b - r) / delta) + 2)
+		} else { // max_val == b
+			h = 60 * (((r - g) / delta) + 4)
+		}
+	}
+	
+	return Vec4{h, s, v, a}
+}
+
+hsv_to_rbg_vec4 :: proc(hsv: Vec4) -> Vec4 {
+	h, s, v, a := hsv[0], hsv[1], hsv[2], hsv[3]
+	
+	// Handle edge cases
+	if s == 0 {
+		return Vec4{v, v, v, a} // grayscale
+	}
+	
+	h = h / 60.0 // sector 0 to 5
+	sector := int(math.floor(h))
+	f := h - f32(sector) // factorial part of h
+	p := v * (1 - s)
+	q := v * (1 - s * f)
+	t := v * (1 - s * (1 - f))
+	
+	r, g, b: f32
+	switch sector {
+		case 0:
+			r, g, b = v, t, p
+		case 1:
+			r, g, b = q, v, p
+		case 2:
+			r, g, b = p, v, t
+		case 3:
+			r, g, b = p, q, v
+		case 4:
+			r, g, b = t, p, v
+		case:
+			r, g, b = v, p, q
+	}
+	
+	return Vec4{r, g, b, a}
+}
+
+do_highlight :: proc(col: Vec4) -> Vec4 {
+	hsv := rgb_to_hsv_vec4(col)
+	if hsv.z > 0.8 {
+		hsv.z -= 0.2
+	} else {
+		hsv.z += 0.2
+	}
+	return hsv_to_rbg_vec4(hsv)
+}
+
+swap :: proc(a: ^$T, b: ^T) {
+	og := a^
+	a^ = b^
+	b^ = og
+}
+
+quick_n_dirty_string_id :: proc(allocator := context.allocator) -> string {
+	// Generate a random alphanumeric string suitable for JSON keys
+	chars := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	length := 12 // Should be long enough to avoid collisions for most purposes
+
+	prefix :: "id_"
+	
+	result := make([]u8, length, allocator)
+	for i in 0..<length {
+		idx := rand_int(len(chars) - 1)
+		result[i] = chars[idx]
+	}
+	
+	return strings.concatenate({prefix, string(result)}, allocator)
+}
+
+// copied this and disabled the crypogrpahic assert, not needed to be that robust lol.
+generate_v7_basic_no_crypto :: proc(timestamp: Maybe(time.Time) = nil) -> (result: uuid.Identifier) {
+	using uuid
+	//assert(.Cryptographic in runtime.random_generator_query_info(context.random_generator), NO_CSPRNG_ERROR)
+	unix_time_in_milliseconds := time.to_unix_nanoseconds(timestamp.? or_else time.now()) / 1e6
+
+	result = transmute(Identifier)(cast(u128be)unix_time_in_milliseconds << VERSION_7_TIME_SHIFT)
+
+	bytes_generated := rand.read(result[6:])
+	assert(bytes_generated == 10, "RNG failed to generate 10 bytes for UUID v7.")
+
+	result[VERSION_BYTE_INDEX] &= 0x0F
+	result[VERSION_BYTE_INDEX] |= 0x70
+
+	result[VARIANT_BYTE_INDEX] &= 0x3F
+	result[VARIANT_BYTE_INDEX] |= 0x80
+
+	return
+}
+
+is_vec2_fucked :: proc(v: Vec2) -> bool {
+	return math.is_nan(v.x) || math.is_nan(v.y) || math.is_inf(v.x) || math.is_inf(v.y)
+}
+
+round_to_grid :: proc(v: Vec2, grid_length: f32) -> Vec2 {
+	v := v
+	v.x = math.round(v.x / grid_length) * grid_length
+	v.y = math.round(v.y / grid_length) * grid_length
+	return v
+}
+
+find_first_match :: proc(array: ^$D/[dynamic]$T, element: T, loc := #caller_location) -> (index:int, found:bool) {
+	for e, i in array {
+		if e == element {
+			index = i
+			found = true
+			break
+		}
+	}
+	return
+}
+
+snap_to_interval :: proc(x: f32, interval: f32) -> f32 {
+	return math.round(x / interval) * interval
 }

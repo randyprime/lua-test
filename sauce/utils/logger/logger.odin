@@ -16,8 +16,10 @@ get_context_for_logging :: proc() -> runtime.Context {
 	return our_context
 }
 
+global_log_level := log.Level.Debug
+
 logger :: proc() -> log.Logger {
-	return log.Logger{logger_proc, nil, log.Level.Debug, nil}
+	return log.Logger{logger_proc, nil, global_log_level, nil} // idk why min log level gets used in here.
 }
 
 assertion_failure_proc :: proc(prefix, message: string, loc: runtime.Source_Code_Location) -> ! {
@@ -39,6 +41,10 @@ assertion_failure_proc :: proc(prefix, message: string, loc: runtime.Source_Code
 
 
 logger_proc :: proc(data: rawptr, level: log.Level, text: string, options: log.Options, location := #caller_location) {
+	if level < global_log_level {
+		return
+	}
+
 	// todo, dump this into a file as well.
 
   b := strings.builder_make(context.temp_allocator)

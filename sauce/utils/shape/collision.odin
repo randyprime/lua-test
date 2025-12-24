@@ -48,6 +48,10 @@ rect_collide_circle :: proc(aabb: Rect, circle: Circle) -> (bool, Vec2) {
 }
 
 rect_collide_rect :: proc(a: Rect, b: Rect) -> (bool, Vec2) {
+	if a == {} || b == {} { // early out if any of the rects are empty
+		return false, {}
+	}
+
 	// Calculate overlap on each axis
 	dx := (a.z + a.x) / 2 - (b.z + b.x) / 2;
 	dy := (a.w + a.y) / 2 - (b.w + b.y) / 2;
