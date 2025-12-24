@@ -12,3 +12,4 @@ template-starter.rbg
 /asset_workbench/fmod/.cache
 /.vs
 generated_shader.odin
+generated.odin
