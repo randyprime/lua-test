@@ -91,6 +91,10 @@ Entity :: struct {
 	update_proc: proc(^Entity),
 	draw_proc: proc(Entity),
 
+	// Lua scripting support
+	is_lua_entity: bool,
+	lua_data_ref: int, // Reference to Lua table in registry
+
 	// big sloppy entity state dump.
 	// add whatever you need in here.
 	pos: Vec2,
@@ -116,6 +120,7 @@ Entity_Kind :: enum {
 	nil,
 	player,
 	thing1,
+	lua_scripted,
 }
 
 entity_setup :: proc(e: ^Entity, kind: Entity_Kind) {
@@ -127,6 +132,7 @@ entity_setup :: proc(e: ^Entity, kind: Entity_Kind) {
 		case .nil:
 		case .player: setup_player(e)
 		case .thing1: setup_thing1(e)
+		case .lua_scripted: setup_lua_entity(e)
 	}
 }
 
@@ -214,7 +220,8 @@ get_sprite_center_mass :: proc(img: Sprite_Name) -> Vec2 {
 // main game procs
 
 app_init :: proc() {
-
+	// Initialize Lua scripting system
+	lua_init()
 }
 
 app_frame :: proc() {
@@ -243,6 +250,7 @@ app_frame :: proc() {
 
 app_shutdown :: proc() {
 	// called on exit
+	lua_shutdown()
 }
 
 game_update :: proc() {
@@ -260,6 +268,27 @@ game_update :: proc() {
 	if ctx.gs.ticks == 0 {
 		player := entity_create(.player)
 		ctx.gs.player_handle = player.handle
+		
+		// Spawn Lua entities (optional - comment out if Lua isn't working)
+		log.info("Spawning Lua entities...")
+		
+		wanderer := load_lua_entity("res/scripts/wanderer.lua")
+		if wanderer != nil {
+			wanderer.pos = {50, 0}
+			log.info("Spawned wanderer entity")
+		}
+		
+		spinner := load_lua_entity("res/scripts/spinner.lua")
+		if spinner != nil {
+			spinner.pos = {-50, 0}
+			log.info("Spawned spinner entity")
+		}
+		
+		follower := load_lua_entity("res/scripts/player_follower.lua")
+		if follower != nil {
+			follower.pos = {0, 30}
+			log.info("Spawned follower entity")
+		}
 	}
 
 	rebuild_scratch_helpers()
@@ -431,6 +460,16 @@ setup_player :: proc(e: ^Entity) {
 
 setup_thing1 :: proc(using e: ^Entity) {
 	kind = .thing1
+}
+
+setup_lua_entity :: proc(e: ^Entity) {
+	e.kind = .lua_scripted
+	e.is_lua_entity = true
+	
+	// Lua entities use a scripted update proc
+	e.update_proc = proc(e: ^Entity) {
+		lua_call_entity_update(e)
+	}
 }
 
 entity_set_animation :: proc(e: ^Entity, sprite: Sprite_Name, frame_duration: f32, looping:=true) {

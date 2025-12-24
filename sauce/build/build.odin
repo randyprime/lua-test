@@ -182,6 +182,8 @@ main :: proc() {
 		utils.fire(..c[:])
 	}
 
+	odin_root := "C:/rando/dev/odin/"
+
 	// copy stuff into folder
 	{
 		// NOTE, if it already exists, it won't copy (to save build time)
@@ -189,18 +191,29 @@ main :: proc() {
 
 		switch target {
 		case .windows:
+			// FMOD DLLs
 			append(&files_to_copy, "sauce/fmod/studio/lib/windows/x64/fmodstudio.dll")
 			append(&files_to_copy, "sauce/fmod/studio/lib/windows/x64/fmodstudioL.dll")
 			append(&files_to_copy, "sauce/fmod/core/lib/windows/x64/fmod.dll")
 			append(&files_to_copy, "sauce/fmod/core/lib/windows/x64/fmodL.dll")
 
+			lua_dll := path.join({odin_root, "vendor", "lua", "5.4", "windows", "lua54.dll"})
+			if os.exists(lua_dll) {
+				append(&files_to_copy, lua_dll)
+			} else {
+				log.error("no lua dll found at", lua_dll)
+			}
+			
+
 		case .mac:
+			// FMOD DLLs
 			append(&files_to_copy, "sauce/fmod/studio/lib/darwin/libfmodstudio.dylib")
 			append(&files_to_copy, "sauce/fmod/studio/lib/darwin/libfmodstudioL.dylib")
 			append(&files_to_copy, "sauce/fmod/core/lib/darwin/libfmod.dylib")
 			append(&files_to_copy, "sauce/fmod/core/lib/darwin/libfmodL.dylib")
+			
 		case .linux:
-		//TODO: linux fmod support
+			//TODO: linux fmod support
 		}
 
 		for src in files_to_copy {
@@ -208,7 +221,10 @@ main :: proc() {
 			//assert(os.exists(dir), fmt.tprint("directory doesn't exist:", dir, file_name))
 			dest := fmt.tprintf("%v/%v", out_dir, file_name)
 			if !os.exists(dest) {
-				os2.copy_file(dest, src)
+				err := os2.copy_file(dest, src)
+				if err != nil {
+					log.warnf("Failed to copy %s: %v", src, err)
+				}
 			}
 		}
 	}

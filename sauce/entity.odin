@@ -85,6 +85,11 @@ entity_create :: proc(kind: Entity_Kind) -> ^Entity {
 }
 
 entity_destroy :: proc(e: ^Entity) {
+	// Clean up Lua references if this is a Lua entity
+	if e.is_lua_entity {
+		lua_release_entity(e)
+	}
+	
 	append(&ctx.gs.entity_free_list, e.handle.index)
 	e^ = {}
 }
