@@ -1,12 +1,13 @@
 -- Wanderer Entity
--- A simple entity that wanders back and forth
+-- Wanders left and right, changing direction periodically
+-- SAVE/LOAD TEST: Tests timer countdown and discrete state changes
 
 local entity = {
-    -- Custom data fields
+    -- Custom data fields that get saved/loaded
     wander_speed = 50,
-    wander_dir = 1,
-    change_dir_timer = 0,
-    change_dir_interval = 2.0,
+    wander_dir = 1,            -- current direction: 1 or -1
+    change_dir_timer = 0,      -- counts down to direction change
+    change_dir_interval = 2.0, -- seconds between direction changes
 }
 
 function entity:update(dt)

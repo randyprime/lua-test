@@ -13,3 +13,4 @@ template-starter.rbg
 /.vs
 generated_shader.odin
 generated.odin
+worlds/**

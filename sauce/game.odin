@@ -16,9 +16,12 @@ import "core:fmt"
 import "core:mem"
 import "core:math"
 import "core:math/linalg"
+import "core:os"
+import "core:encoding/cbor"
 
 import sapp "sokol/app"
 import spall "core:prof/spall"
+import lua "vendor:lua/5.4"
 
 VERSION :string: "v0.0.0"
 WINDOW_TITLE :: "Template [bald]"
@@ -88,12 +91,13 @@ Entity :: struct {
 	kind: Entity_Kind,
 
 	// todo, move this into static entity data
-	update_proc: proc(^Entity),
-	draw_proc: proc(Entity),
+	update_proc: proc(^Entity) `cbor:"-"`,
+	draw_proc: proc(Entity) `cbor:"-"`,
 
 	// Lua scripting support
 	is_lua_entity: bool,
 	lua_data_ref: int, // Reference to Lua table in registry
+	lua_script_name: string, // Name of the Lua script this entity was spawned from
 
 	// big sloppy entity state dump.
 	// add whatever you need in here.
@@ -269,25 +273,21 @@ game_update :: proc() {
 		player := entity_create(.player)
 		ctx.gs.player_handle = player.handle
 		
-		// Spawn Lua entities (optional - comment out if Lua isn't working)
+		// Spawn Lua entities for testing save/load
 		log.info("Spawning Lua entities...")
 		
+		// Wanderer - tests timer and direction state
 		wanderer := spawn_lua_entity("wanderer")
 		if wanderer != nil {
-			wanderer.pos = {50, 0}
-			log.info("Spawned wanderer entity")
+			wanderer.pos = {-60, 0}
+			log.info("Spawned wanderer entity (left)")
 		}
 		
+		// Spinner - tests time accumulation and continuous state
 		spinner := spawn_lua_entity("spinner")
 		if spinner != nil {
-			spinner.pos = {-50, 0}
-			log.info("Spawned spinner entity")
-		}
-		
-		follower := spawn_lua_entity("player_follower")
-		if follower != nil {
-			follower.pos = {0, 30}
-			log.info("Spawned follower entity")
+			spinner.pos = {60, 0}
+			log.info("Spawned spinner entity (right)")
 		}
 	}
 
@@ -310,6 +310,20 @@ game_update :: proc() {
 		pos := mouse_pos_in_current_space()
 		log.info("schloop at", pos)
 		sound_play("event:/schloop", pos=pos)
+	}
+
+	// Save/Load system hotkeys
+	if key_pressed(.F) && key_down(.LEFT_ALT) {
+		consume_key_pressed(.F)
+		save_game_to_disk()
+		log.info("=== GAME SAVED (Alt+F) ===")
+	}
+
+	if key_pressed(.V) && key_down(.LEFT_ALT) {
+		consume_key_pressed(.V)
+		clear_game_state()
+		load_game_from_disk()
+		log.info("=== GAME LOADED (Alt+V) ===")
 	}
 
 	utils.animate_to_target_v2(&ctx.gs.cam_pos, get_player().pos, ctx.delta_t, rate=10)
@@ -510,4 +524,147 @@ update_entity_animation :: proc(e: ^Entity) {
 			}
 		}
 	}
+}
+
+//
+// Save / Load System
+//
+
+// Serializable game state that can be saved to disk
+Game_State_Save :: struct {
+	gs: Game_State,
+	lua_entity_data: map[int]Lua_Entity_Save_Data, // Maps entity index to Lua data
+}
+
+save_game_to_disk :: proc() {
+	utils.make_directory_if_not_exist("worlds")
+	
+	log.info("Saving game state...")
+	
+	// Create save data structure using temporary allocator to avoid stack overflow
+	save_data := new(Game_State_Save, context.temp_allocator)
+	
+	save_data.gs = ctx.gs^
+	save_data.lua_entity_data = make(map[int]Lua_Entity_Save_Data, allocator = context.temp_allocator)
+	
+	// Extract Lua entity data
+	for &e, idx in ctx.gs.entities {
+		if !is_valid(e) do continue
+		
+		if e.is_lua_entity && e.lua_data_ref != 0 {
+			lua_data := lua_extract_entity_data(&e)
+			save_data.lua_entity_data[idx] = lua_data
+		}
+	}
+	
+	// Serialize to CBOR using temp allocator
+	cbor_data, marshal_err := cbor.marshal_into_bytes(save_data^, cbor.ENCODE_FULLY_DETERMINISTIC, context.temp_allocator)
+	if marshal_err != nil {
+		log.errorf("Failed to marshal game state: %v", marshal_err)
+		return
+	}
+	
+	// Write to disk
+	write_ok := os.write_entire_file("worlds/save.cbor", cbor_data)
+	if !write_ok {
+		log.error("Failed to write save file")
+		return
+	}
+	
+	log.infof("Game saved successfully (%d bytes, %d Lua entities)", len(cbor_data), len(save_data.lua_entity_data))
+}
+
+load_game_from_disk :: proc() {
+	log.info("Loading game state...")
+	
+	// Read from disk using temp allocator (file data is temporary)
+	file_data, read_ok := os.read_entire_file("worlds/save.cbor", context.temp_allocator)
+	if !read_ok {
+		log.error("Failed to read save file")
+		return
+	}
+	
+	// Deserialize from CBOR - use temp allocator for the save_data wrapper
+	// but CBOR will use the default allocator for nested structures
+	save_data := new(Game_State_Save, context.temp_allocator)
+	
+	unmarshal_err := cbor.unmarshal(file_data, save_data)
+	if unmarshal_err != nil {
+		log.errorf("Failed to unmarshal game state: %v", unmarshal_err)
+		return
+	}
+	// Note: save_data itself uses temp allocator, but nested allocations
+	// (like entity_free_list in Game_State) use the default allocator and persist
+	
+	// Restore game state
+	ctx.gs^ = save_data.gs
+	
+	// Restore Lua entity data
+	for &e, idx in ctx.gs.entities {
+		if !is_valid(e) do continue
+		
+		if e.is_lua_entity {
+			// Lua entities need their references re-created
+			lua_data, has_lua_data := save_data.lua_entity_data[idx]
+			
+			if has_lua_data && lua_data.script_name != "" {
+				// Look up the script in the registry
+				script_ref, found := lua_script_registry[lua_data.script_name]
+				if !found {
+					log.errorf("Lua script '%s' not found when loading entity", lua_data.script_name)
+					continue
+				}
+				
+				// Get the script table from the registry
+				lua.rawgeti(lua_state, lua.REGISTRYINDEX, lua.Integer(script_ref))
+				
+				if !lua.istable(lua_state, -1) {
+					log.errorf("Invalid script reference for '%s'", lua_data.script_name)
+					lua.pop(lua_state, 1)
+					continue
+				}
+				
+				// Clone the script table for this entity instance
+				lua.newtable(lua_state) // Create new table for this instance
+				
+				// Copy all fields from the script table to the instance table
+				lua.pushnil(lua_state) // First key
+				for lua.next(lua_state, -3) != 0 {
+					lua.pushvalue(lua_state, -2) // Copy key
+					lua.pushvalue(lua_state, -2) // Copy value
+					lua.settable(lua_state, -5) // instance_table[key] = value
+					lua.pop(lua_state, 1) // Pop value, keep key for next iteration
+				}
+				
+				// Remove the script table, keep the instance table
+				lua.remove(lua_state, -2)
+				
+				// Store the instance table in the registry
+				ref := lua.L_ref(lua_state, lua.REGISTRYINDEX)
+				e.lua_data_ref = int(ref)
+				
+				// Restore the saved data into the Lua table
+				lua_restore_entity_data(&e, lua_data)
+				
+				log.infof("Restored Lua entity '%s' at index %d", lua_data.script_name, idx)
+			}
+		}
+	}
+	
+	log.info("Game loaded successfully")
+}
+
+clear_game_state :: proc() {
+	log.info("Clearing game state...")
+	
+	// Destroy all entities (this will clean up Lua references)
+	for &e in ctx.gs.entities {
+		if !is_valid(e) do continue
+		entity_destroy(&e)
+	}
+	
+	// Reset the game state
+	ctx.gs^ = {}
+	
+	log.info("Game state cleared")
 }

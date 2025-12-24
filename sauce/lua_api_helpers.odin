@@ -84,21 +84,3 @@ check_args :: #force_inline proc(L: ^lua.State, count: i32) -> bool {
 	return lua.gettop(L) >= count
 }
 
-// === Generic String to Enum Converter ===
-
-// Convert a string to any enum type using reflection
-string_to_enum :: proc($T: typeid, name: cstring) -> (T, bool) where intrinsics.type_is_enum(T) {
-	type_info := type_info_of(T)
-	enum_info := type_info.variant.(reflect.Type_Info_Enum)
-	
-	name_str := string(name)
-	
-	for enum_name, idx in enum_info.names {
-		if strings.to_lower(enum_name) == strings.to_lower(name_str) {
-			return T(enum_info.values[idx]), true
-		}
-	}
-	
-	return T{}, false
-}
-

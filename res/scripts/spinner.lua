@@ -1,13 +1,14 @@
 -- Spinner Entity
--- An entity that spins in place
+-- Spins and bobs up and down
+-- SAVE/LOAD TEST: Tests time accumulation and computed values
 
 local entity = {
-    -- Custom data fields
+    -- Custom data fields that get saved/loaded
     spin_speed = 2.0,  -- radians per second
     bob_speed = 1.0,
     bob_amount = 10.0,
-    start_y = 0,
-    time = 0,
+    start_y = 0,       -- computed on first frame
+    time = 0,          -- accumulates over time
 }
 
 function entity:update(dt)

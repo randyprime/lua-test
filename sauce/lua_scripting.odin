@@ -228,6 +228,7 @@ spawn_lua_entity :: proc(script_name: string) -> ^Entity {
 	// Store the instance table in the registry
 	ref := lua.L_ref(lua_state, lua.REGISTRYINDEX)
 	entity.lua_data_ref = int(ref)
+	entity.lua_script_name = strings.clone(script_name)
 	
 	log.infof("Spawned Lua entity from '%s' (instance ref: %d)", script_name, ref)
 	
@@ -287,6 +288,12 @@ lua_release_entity :: proc(entity: ^Entity) {
 	
 	lua.L_unref(lua_state, lua.REGISTRYINDEX, i32(entity.lua_data_ref))
 	entity.lua_data_ref = 0
+	
+	// Free the script name string
+	if entity.lua_script_name != "" {
+		delete(entity.lua_script_name)
+		entity.lua_script_name = ""
+	}
 }
 
 // Get the currently active entity (for API calls)
@@ -298,5 +305,123 @@ lua_get_current_entity :: proc() -> ^Entity {
 	lua.pop(lua_state, 1)
 	
 	return entity
+}
+
+//
+// Lua Entity Serialization
+//
+
+// Union type for Lua values that can be serialized
+Lua_Value :: union {
+	f64,
+	bool,
+	string,
+}
+
+// Save data for a Lua entity
+Lua_Entity_Save_Data :: struct {
+	script_name: string,
+	entity_data: map[string]Lua_Value,
+}
+
+// Extract Lua entity data into a serializable format
+lua_extract_entity_data :: proc(entity: ^Entity) -> Lua_Entity_Save_Data {
+	data := Lua_Entity_Save_Data{
+		script_name = strings.clone(entity.lua_script_name, context.temp_allocator),
+		entity_data = make(map[string]Lua_Value, allocator = context.temp_allocator),
+	}
+	
+	if lua_state == nil || entity.lua_data_ref == 0 {
+		return data
+	}
+	
+	// Push the entity table onto the stack
+	lua.rawgeti(lua_state, lua.REGISTRYINDEX, lua.Integer(entity.lua_data_ref))
+	
+	if !lua.istable(lua_state, -1) {
+		log.error("Invalid Lua entity reference during extraction")
+		lua.pop(lua_state, 1)
+		return data
+	}
+	
+	// Iterate through all key-value pairs in the table
+	lua.pushnil(lua_state) // First key
+	for lua.next(lua_state, -2) != 0 {
+		// Stack: table, key, value
+		
+		// Get the key (must be a string)
+		if lua.type(lua_state, -2) == .STRING {
+			key := lua.tostring(lua_state, -2)
+			key_copy := strings.clone(string(key), context.temp_allocator)
+			
+			// Extract value based on type
+			value_type := lua.type(lua_state, -1)
+			#partial switch value_type {
+				case .NUMBER:
+					data.entity_data[key_copy] = f64(lua.tonumber(lua_state, -1))
+				case .BOOLEAN:
+					data.entity_data[key_copy] = bool(lua.toboolean(lua_state, -1))
+				case .STRING:
+					str := lua.tostring(lua_state, -1)
+					data.entity_data[key_copy] = strings.clone(string(str), context.temp_allocator)
+				case .FUNCTION:
+					// Skip functions - they can't be serialized
+				case .TABLE:
+					// Skip nested tables for now (could be expanded later)
+				case:
+					log.warnf("Skipping Lua value of type %v for key '%s'", value_type, key)
+			}
+		}
+		
+		// Pop value, keep key for next iteration
+		lua.pop(lua_state, 1)
+	}
+	
+	// Pop the table
+	lua.pop(lua_state, 1)
+	
+	log.infof("Extracted %d values from Lua entity '%s'", len(data.entity_data), data.script_name)
+	
+	return data
+}
+
+// Restore Lua entity data from saved data
+lua_restore_entity_data :: proc(entity: ^Entity, data: Lua_Entity_Save_Data) {
+	if lua_state == nil || entity.lua_data_ref == 0 {
+		return
+	}
+	
+	// Push the entity table onto the stack
+	lua.rawgeti(lua_state, lua.REGISTRYINDEX, lua.Integer(entity.lua_data_ref))
+	
+	if !lua.istable(lua_state, -1) {
+		log.error("Invalid Lua entity reference during restoration")
+		lua.pop(lua_state, 1)
+		return
+	}
+	
+	// Set all saved values back into the table
+	for key, value in data.entity_data {
+		// Push the key
+		lua.pushstring(lua_state, strings.clone_to_cstring(key, context.temp_allocator))
+		
+		// Push the value based on type
+		switch v in value {
+			case f64:
+				lua.pushnumber(lua_state, lua.Number(v))
+			case bool:
+				lua.pushboolean(lua_state, b32(v))
+			case string:
+				lua.pushstring(lua_state, strings.clone_to_cstring(v, context.temp_allocator))
+		}
+		
+		// Set table[key] = value
+		lua.settable(lua_state, -3)
+	}
+	
+	// Pop the table
+	lua.pop(lua_state, 1)
+	
+	log.infof("Restored %d values to Lua entity '%s'", len(data.entity_data), data.script_name)
 }
 

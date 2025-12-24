@@ -12,6 +12,7 @@ Uses lua_api_helpers.odin to reduce boilerplate.
 
 import "core:log"
 import "core:fmt"
+import "core:reflect"
 import "base:runtime"
 import lua "vendor:lua/5.4"
 
@@ -126,7 +127,7 @@ lua_api_set_animation :: proc "c" (L: ^lua.State) -> i32 {
 	frame_duration := lua_to_f32(L, 2)
 	loop := check_args(L, 3) ? lua_to_bool(L, 3) : true
 	
-	sprite, sprite_ok := string_to_enum(Sprite_Name, sprite_name)
+	sprite, sprite_ok := reflect.enum_from_name(Sprite_Name, string(sprite_name))
 	if sprite_ok && sprite != .nil {
 		entity_set_animation(entity, sprite, frame_duration, loop)
 	}
@@ -154,7 +155,7 @@ lua_api_key_down :: proc "c" (L: ^lua.State) -> i32 {
 	}
 	
 	action_name := lua.tostring(L, 1)
-	action, ok := string_to_enum(Input_Action, action_name)
+	action, ok := reflect.enum_from_name(Input_Action, string(action_name))
 	if !ok {
 		push_bool(L, false)
 		return 1
@@ -175,7 +176,7 @@ lua_api_key_pressed :: proc "c" (L: ^lua.State) -> i32 {
 	}
 	
 	action_name := lua.tostring(L, 1)
-	action, ok := string_to_enum(Input_Action, action_name)
+	action, ok := reflect.enum_from_name(Input_Action, string(action_name))
 	if !ok {
 		push_bool(L, false)
 		return 1
