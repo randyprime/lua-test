@@ -183,7 +183,7 @@ main :: proc() {
 	}
 
 	// copy stuff into folder
-	if release {
+	{
 		// NOTE, if it already exists, it won't copy (to save build time)
 		files_to_copy: [dynamic]string
 
