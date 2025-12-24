@@ -19,6 +19,7 @@ import "core:log"
 import "core:reflect"
 import "core:time"
 
+// we are assuming we're right next to the bald collection
 import logger "../utils/logger"
 import utils "../utils"
 
@@ -30,11 +31,27 @@ Target :: enum {
 	linux,
 }
 
+Game_Kind :: enum {
+	full,
+	demo,
+	playtest,
+}
+
 main :: proc() {
 	context.logger = logger.logger()
 	context.assertion_failure_proc = logger.assertion_failure_proc
 
-	//fmt.println(os2.args)
+	game_kind:= Game_Kind.full
+
+	release, debug : bool
+	for arg in os2.args {
+		switch arg {
+			case "release": release = true
+			case "debug": debug = true
+			case "playtest": game_kind = .playtest
+			case "demo": game_kind = .demo
+		}
+	}
 
 	start_time := time.now()
 
@@ -81,6 +98,13 @@ main :: proc() {
 		fprintln(f, "	linux,")
 		fprintln(f, "}")
 		fprintln(f, tprintf("PLATFORM :: Platform.%v", target))
+		fprintln(f, "")
+		fprintln(f, "Game_Kind :: enum {")
+		fprintln(f, "	full,")
+		fprintln(f, "	demo,")
+		fprintln(f, "	playtest,")
+		fprintln(f, "}")
+		fprintln(f, tprintf("GAME_KIND :: Game_Kind.%v", game_kind))
 	}
 
 	// generate the shader
@@ -118,12 +142,20 @@ main :: proc() {
 
 	out_dir: string
 	switch target {
-	case .windows:
-		out_dir = "build/windows_debug"
-	case .mac:
-		out_dir = "build/mac_debug"
-	case .linux:
-		out_dir = "build/linux_debug"
+		case .windows: out_dir = "build/windows_%v"
+		case .mac: out_dir = "build/mac_%v"
+		case .linux: out_dir = "build/linux_%v"
+	}
+	out_dir = fmt.tprintf(out_dir, release ? "release" : "debug")
+	// on the end here, extra flags for playtest and whatnot ?
+
+	// delete the build folder if it's release mode, that way we clean shit up
+	if release {
+		err := os2.remove_all(out_dir)
+		if err != nil {
+			log.error(err)
+			return
+		}
 	}
 
 	full_out_dir_path := path.join({wd, out_dir})
@@ -136,16 +168,22 @@ main :: proc() {
 			"odin",
 			"build",
 			"sauce",
-			"-debug",
-			fmt.tprintf("-out:%v", path.join({out_dir, EXE_NAME})),
+			fmt.tprintf("-out:%v/%v.exe", out_dir, EXE_NAME),
+		}
+		if debug || !release {
+			append(&c, "-debug")
+			// append(&c, "-o:speed")
+		}
+		if release {
+			append(&c, fmt.tprintf("-define:RELEASE=%v", release))
+			append(&c, "-o:speed")
 		}
 		// not needed, it's easier to just generate code into generated.odin
-		//append(&c, fmt.tprintf("-define:TARGET_STRING=%v", target))
 		utils.fire(..c[:])
 	}
 
 	// copy stuff into folder
-	{
+	if release {
 		// NOTE, if it already exists, it won't copy (to save build time)
 		files_to_copy: [dynamic]string
 
@@ -167,12 +205,17 @@ main :: proc() {
 
 		for src in files_to_copy {
 			dir, file_name := path.split(src)
-			assert(os.exists(dir), fmt.tprint("directory doesn't exist:", dir))
+			//assert(os.exists(dir), fmt.tprint("directory doesn't exist:", dir, file_name))
 			dest := fmt.tprintf("%v/%v", out_dir, file_name)
 			if !os.exists(dest) {
 				os2.copy_file(dest, src)
 			}
 		}
+	}
+
+	// copy res folder
+	if release {
+		utils.copy_directory(fmt.tprintf("%v/res", out_dir), "res")
 	}
 
 	fmt.println("DONE in", time.diff(start_time, time.now()))
