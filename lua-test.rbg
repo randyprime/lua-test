@@ -1,17 +1,21 @@
 // raddbg 0.9.24 project file
 
+recent_file: path: "sauce/wasm/wasm_runtime.odin"
+recent_file: path: "sauce/utils/logger/logger.odin"
+recent_file: path: "../odin/core/log/log.odin"
+recent_file: path: "sauce/wasm/wasm_host_api.odin"
+recent_file: path: "sauce/core_sound.odin"
 recent_file: path: "sauce/game.odin"
 recent_file: path: "sauce/lua_scripting.odin"
-recent_file: path: "sauce/utils/logger/logger.odin"
 recent_file: path: "sauce/lua_api_helpers.odin"
 target:
 {
   executable: "build/windows_debug/game.exe"
-  working_directory: ""
+  working_directory: "../lua-test"
   enabled: 1
 }
 debug_info:
 {
   path: "C:/rando/dev/lua-test/build/windows_debug/game.pdb"
-  timestamp: 66201986200482
+  timestamp: 66202040669517
 }

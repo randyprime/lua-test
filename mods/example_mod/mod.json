@@ -1,0 +1,8 @@
+{
+	"name": "Example Mod",
+	"version": "1.0.0",
+	"author": "Modder",
+	"description": "Example mod showcasing the WASM modding API",
+	"entry_script": "example_mod.odin"
+}
+

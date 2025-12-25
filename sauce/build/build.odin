@@ -197,13 +197,8 @@ main :: proc() {
 			append(&files_to_copy, "sauce/fmod/core/lib/windows/x64/fmod.dll")
 			append(&files_to_copy, "sauce/fmod/core/lib/windows/x64/fmodL.dll")
 
-			lua_dll := path.join({odin_root, "vendor", "lua", "5.4", "windows", "lua54.dll"})
-			if os.exists(lua_dll) {
-				append(&files_to_copy, lua_dll)
-			} else {
-				log.error("no lua dll found at", lua_dll)
-			}
-			
+			// Wasmtime DLL
+			append(&files_to_copy, "sauce/wasm/wasmtime-c/lib/wasmtime.dll")
 
 		case .mac:
 			// FMOD DLLs
@@ -232,6 +227,12 @@ main :: proc() {
 	// copy res folder
 	if release {
 		utils.copy_directory(fmt.tprintf("%v/res", out_dir), "res")
+	}
+	
+	// copy mods folder (always copy for WASM modding)
+	{
+		mods_dest := fmt.tprintf("%v/mods", out_dir)
+		utils.copy_directory(mods_dest, "mods")
 	}
 
 	fmt.println("DONE in", time.diff(start_time, time.now()))

@@ -15,6 +15,7 @@ MAX_ENTITIES :: 2048 // increase this as needed.
 import "base:runtime"
 import "core:log"
 import "core:fmt"
+import "core:strings"
 
 Entity_Handle :: struct {
 	index: int,
@@ -61,14 +62,38 @@ entity_from_handle :: proc(handle: Entity_Handle) -> (entity: ^Entity, ok:bool) 
 }
 
 entity_create :: proc(script_name: string) -> ^Entity {
-	// Simply forward to spawn_lua_entity which handles everything
-	return spawn_lua_entity(script_name)
+	// Create entity structure (WASM mods will spawn via host API)
+	index := -1
+	if len(ctx.gs.entity_free_list) > 0 {
+		index = pop(&ctx.gs.entity_free_list)
+	}
+	
+	if index == -1 {
+		assert(ctx.gs.entity_top_count+1 < MAX_ENTITIES, "ran out of entities")
+		ctx.gs.entity_top_count += 1
+		index = ctx.gs.entity_top_count
+	}
+	
+	entity := &ctx.gs.entities[index]
+	entity.handle.index = index
+	entity.handle.id = ctx.gs.latest_entity_id + 1
+	ctx.gs.latest_entity_id = entity.handle.id
+	
+	// Setup function pointers
+	entity_setup(entity)
+	
+	// Mark as WASM entity
+	entity.is_wasm_entity = true
+	entity.wasm_script_name = strings.clone(script_name)
+	entity.wasm_entity_id = u64(entity.handle.id)
+	
+	return entity
 }
 
 entity_destroy :: proc(e: ^Entity) {
-	// Clean up Lua references if this is a Lua entity
-	if e.is_lua_entity {
-		lua_release_entity(e)
+	// Clean up WASM entity data
+	if e.is_wasm_entity {
+		delete(e.wasm_script_name)
 	}
 	
 	append(&ctx.gs.entity_free_list, e.handle.index)

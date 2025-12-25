@@ -1,0 +1,8 @@
+{
+	"name": "Core",
+	"version": "1.0.0",
+	"author": "Game Developer",
+	"description": "Core game mod containing all base gameplay",
+	"entry_script": "core.odin"
+}
+

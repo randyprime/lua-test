@@ -1,0 +1,6 @@
+
+reworked to use wasmtime, bc I think it'll be better than LUA.
+
+problem is that the bindings are cooked. We're making them ourselves, so it's very error prone.
+
+might be better to just use Lua and call it a day. Not sure what the solution here is.

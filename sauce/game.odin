@@ -21,7 +21,7 @@ import "core:encoding/cbor"
 
 import sapp "sokol/app"
 import spall "core:prof/spall"
-import lua "vendor:lua/5.4"
+import wasm "wasm"
 
 VERSION :string: "v0.0.0"
 WINDOW_TITLE :: "Template [bald]"
@@ -29,6 +29,11 @@ GAME_RES_WIDTH :: 480
 GAME_RES_HEIGHT :: 270
 window_w := 1280
 window_h := 720
+
+// WASM mod system globals
+loaded_mods: map[string]^wasm.Wasm_Mod
+mod_compiler: Mod_Compiler
+file_watcher: File_Watcher
 
 when NOT_RELEASE {
 	// can edit stuff in here to be whatever for testing
@@ -93,10 +98,10 @@ Entity :: struct {
 	update_proc: proc(^Entity) `cbor:"-"`,
 	draw_proc: proc(Entity) `cbor:"-"`,
 
-	// Lua scripting support - all entities are Lua-based now
-	is_lua_entity: bool `cbor:"-"`, // Set during restoration, not serialized
-	lua_data_ref: int `cbor:"-"`, // Reference to Lua table in registry (only valid in current session)
-	lua_script_name: string, // Name of the Lua script this entity was spawned from
+	// WASM entity support - entities are controlled by WASM mods
+	is_wasm_entity: bool `cbor:"-"`,
+	wasm_script_name: string, // Name of the entity type (e.g., "player", "wanderer")
+	wasm_entity_id: u64 `cbor:"-"`, // ID used by WASM mod
 
 	// big sloppy entity state dump.
 	// add whatever you need in here.
@@ -125,11 +130,12 @@ entity_setup :: proc(e: ^Entity) {
 	e.draw_proc = draw_entity_default
 	e.draw_pivot = .bottom_center
 	
-	// All entities use Lua-based update
+	// All entities use WASM-based update
 	e.update_proc = proc(e: ^Entity) {
-		lua_call_entity_update(e)
+		wasm_call_entity_update(e)
 	}
-	e.is_lua_entity = true
+	e.is_wasm_entity = true
+	e.wasm_entity_id = u64(e.handle.id)
 }
 
 //
@@ -216,8 +222,36 @@ get_sprite_center_mass :: proc(img: Sprite_Name) -> Vec2 {
 // main game procs
 
 app_init :: proc() {
-	// Initialize Lua scripting system
-	lua_init()
+	// Initialize WASM runtime
+	wasm_runtime_init()
+	
+	// Set host context for API calls
+	wasm.set_host_context(&ctx, &our_context)
+	
+	// Initialize mod compiler
+	mod_compiler = mod_compiler_create()
+	mod_compiler_add_mod(&mod_compiler, "mods/core")
+	
+	// Compile core mod
+	if !compile_mod_to_wasm(&mod_compiler, "mods/core") {
+		log.error("Failed to compile core mod!")
+	}
+	
+	// Load core mod
+	wasm_path := get_mod_wasm_path("mods/core")
+	defer delete(wasm_path)
+	core_mod, core_ok := wasm.load_wasm_mod(wasm_path, "core")
+	if !core_ok {
+		log.error("Failed to load core mod!")
+	} else {
+		loaded_mods["core"] = core_mod
+		wasm.call_mod_init(core_mod)
+		log.info("Core mod loaded and initialized")
+	}
+	
+	// Initialize file watcher for hot-reload
+	file_watcher = file_watcher_create(".odin", 1.0)
+	file_watcher_add_directory(&file_watcher, "mods")
 }
 
 app_frame :: proc() {
@@ -246,7 +280,17 @@ app_frame :: proc() {
 
 app_shutdown :: proc() {
 	// called on exit
-	lua_shutdown()
+	
+	// Unload all mods
+	for name, mod in loaded_mods {
+		wasm.unload_wasm_mod(mod)
+	}
+	delete(loaded_mods)
+	
+	// Cleanup systems
+	file_watcher_destroy(&file_watcher)
+	mod_compiler_destroy(&mod_compiler)
+	wasm.wasm_runtime_shutdown()
 }
 
 game_update :: proc() {
@@ -262,25 +306,50 @@ game_update :: proc() {
 
 	// setup world for first game tick
 	if ctx.gs.ticks == 0 {
-		// All entities are now Lua-based, spawned via script names
-		log.info("Spawning entities...")
+		// Entities are now spawned by the core WASM mod in mod_init
+		log.info("Game initialized - entities spawned by core mod")
 		
-		// Player
-		player := entity_create("player")
-		ctx.gs.player_handle = player.handle
-		
-		// Wanderer - tests timer and direction state
-		wanderer := entity_create("wanderer")
-		if wanderer != nil {
-			wanderer.pos = {-60, 0}
-			log.info("Spawned wanderer entity (left)")
+		// Find the player entity (spawned by mod)
+		for &e in ctx.gs.entities {
+			if !is_valid(e) do continue
+			if e.wasm_script_name == "player" {
+				ctx.gs.player_handle = e.handle
+				log.info("Found player entity")
+				break
+			}
+		}
+	}
+	
+	// Hot-reload check
+	{
+		current_time := utils.seconds_since_init()
+		changed_files := file_watcher_check(&file_watcher, current_time)
+		defer {
+			for file in changed_files {
+				delete(file)
+			}
+			delete(changed_files)
 		}
 		
-		// Spinner - tests time accumulation and continuous state
-		spinner := entity_create("spinner")
-		if spinner != nil {
-			spinner.pos = {60, 0}
-			log.info("Spawned spinner entity (right)")
+		if len(changed_files) > 0 {
+			log.info("Files changed, recompiling mods...")
+			recompiled := check_and_recompile(&mod_compiler, changed_files[:])
+			defer {
+				for mod_path in recompiled {
+					delete(mod_path)
+				}
+				delete(recompiled)
+			}
+			
+			// Reload the recompiled mods
+			for mod_path in recompiled {
+				mod_name := "core" // For now, we only have core mod
+				if mod, ok := loaded_mods[mod_name]; ok {
+					if wasm.reload_wasm_mod(mod) {
+						log.infof("Hot-reloaded mod: %s", mod_name)
+					}
+				}
+			}
 		}
 	}
 
@@ -292,7 +361,13 @@ game_update :: proc() {
 
 		update_entity_animation(e)
 
-		if e.update_proc != nil {
+		// Call WASM entity update or native update_proc
+		if e.is_wasm_entity {
+			// Call the WASM mod's entity_update_by_name function
+			if core_mod, ok := loaded_mods["core"]; ok {
+				wasm.call_entity_update_by_name(core_mod, e.wasm_script_name, e.wasm_entity_id, ctx.delta_t)
+			}
+		} else if e.update_proc != nil {
 			e.update_proc(e)
 		}
 	}
@@ -309,14 +384,14 @@ game_update :: proc() {
 	if key_pressed(.F) && key_down(.LEFT_ALT) {
 		consume_key_pressed(.F)
 		save_game_to_disk()
-		log.info("=== GAME SAVED (Alt+F) ===")
+		log.info("=== GAME SAVED ===")
 	}
 
 	if key_pressed(.V) && key_down(.LEFT_ALT) {
 		consume_key_pressed(.V)
 		clear_game_state()
 		load_game_from_disk()
-		log.info("=== GAME LOADED (Alt+V) ===")
+		log.info("=== GAME LOADED ===")
 	}
 
 	utils.animate_to_target_v2(&ctx.gs.cam_pos, get_player().pos, ctx.delta_t, rate=10)
@@ -478,7 +553,7 @@ update_entity_animation :: proc(e: ^Entity) {
 // Serializable game state that can be saved to disk
 Game_State_Save :: struct {
 	gs: Game_State,
-	lua_entity_data: map[string]Lua_Entity_Save_Data, // Maps entity index (as string) to Lua data
+	// TODO: WASM entity state serialization
 }
 
 save_game_to_disk :: proc() {
@@ -490,18 +565,9 @@ save_game_to_disk :: proc() {
 	save_data := new(Game_State_Save, context.temp_allocator)
 	
 	save_data.gs = ctx.gs^
-	save_data.lua_entity_data = make(map[string]Lua_Entity_Save_Data, allocator = context.temp_allocator)
 	
-	// Extract Lua entity data
-	for &e, idx in ctx.gs.entities {
-		if !is_valid(e) do continue
-		
-		if e.is_lua_entity && e.lua_data_ref != 0 {
-			lua_data := lua_extract_entity_data(&e)
-			idx_key := fmt.tprintf("%d", idx) // Convert index to string for CBOR compatibility
-			save_data.lua_entity_data[idx_key] = lua_data
-		}
-	}
+	// TODO: Extract WASM entity data
+	// For now, entities will respawn from mod_init on load
 	
 	// Serialize to CBOR using temp allocator
 	cbor_data, marshal_err := cbor.marshal_into_bytes(save_data^, cbor.ENCODE_FULLY_DETERMINISTIC, context.temp_allocator)
@@ -517,7 +583,7 @@ save_game_to_disk :: proc() {
 		return
 	}
 	
-	log.infof("Game saved successfully (%d bytes, %d Lua entities)", len(cbor_data), len(save_data.lua_entity_data))
+	log.infof("Game saved successfully (%d bytes)", len(cbor_data))
 }
 
 load_game_from_disk :: proc() {
@@ -545,56 +611,11 @@ load_game_from_disk :: proc() {
 	// Restore game state
 	ctx.gs^ = save_data.gs
 	
-	// Restore Lua entity data and function pointers
-	for &e, idx in ctx.gs.entities {
+	// TODO: Restore WASM entity data
+	// For now, just setup function pointers
+	for &e in ctx.gs.entities {
 		if !is_valid(e) do continue
-		
-		// Check if this entity has Lua data to restore (convert index to string key)
-		idx_key := fmt.tprintf("%d", idx)
-		lua_data, has_lua_data := save_data.lua_entity_data[idx_key]
-		
-		if has_lua_data && lua_data.script_name != "" {
-			// Look up the script in the registry
-			script_ref, found := lua_script_registry[lua_data.script_name]
-			if !found {
-				log.errorf("Lua script '%s' not found when loading entity", lua_data.script_name)
-				continue
-			}
-			
-			// Get the script table from the registry
-			lua.rawgeti(lua_state, lua.REGISTRYINDEX, lua.Integer(script_ref))
-			
-			if !lua.istable(lua_state, -1) {
-				log.errorf("Invalid script reference for '%s'", lua_data.script_name)
-				lua.pop(lua_state, 1)
-				continue
-			}
-			
-			// Clone the script table for this entity instance
-			lua.newtable(lua_state) // Create new table for this instance
-			
-			// Copy all fields from the script table to the instance table
-			lua.pushnil(lua_state) // First key
-			for lua.next(lua_state, -3) != 0 {
-				lua.pushvalue(lua_state, -2) // Copy key
-				lua.pushvalue(lua_state, -2) // Copy value
-				lua.settable(lua_state, -5) // instance_table[key] = value
-				lua.pop(lua_state, 1) // Pop value, keep key for next iteration
-			}
-			
-			// Remove the script table, keep the instance table
-			lua.remove(lua_state, -2)
-			
-			// Store the NEW instance table in the registry
-			ref := lua.L_ref(lua_state, lua.REGISTRYINDEX)
-			e.lua_data_ref = int(ref)
-			
-			// Restore the saved data into the Lua table
-			lua_restore_entity_data(&e, lua_data)
-			
-			// Set up function pointers now that Lua data is restored
-			entity_setup(&e)
-		}
+		entity_setup(&e)
 	}
 	
 	log.info("Game loaded successfully")
@@ -603,7 +624,7 @@ load_game_from_disk :: proc() {
 clear_game_state :: proc() {
 	log.info("Clearing game state...")
 	
-	// Destroy all entities (this will clean up Lua references)
+	// Destroy all entities
 	for &e in ctx.gs.entities {
 		if !is_valid(e) do continue
 		entity_destroy(&e)
@@ -613,4 +634,20 @@ clear_game_state :: proc() {
 	ctx.gs^ = {}
 	
 	log.info("Game state cleared")
+}
+
+// Helper to call WASM entity update
+wasm_call_entity_update :: proc(e: ^Entity) {
+	if !e.is_wasm_entity do return
+	
+	// Call the core mod's entity_update_by_name function
+	if core_mod, ok := loaded_mods["core"]; ok {
+		wasm.call_entity_update_by_name(core_mod, e.wasm_script_name, e.wasm_entity_id, ctx.delta_t)
+	}
+}
+
+// Initialize WASM runtime
+wasm_runtime_init :: proc() -> bool {
+	loaded_mods = make(map[string]^wasm.Wasm_Mod)
+	return wasm.wasm_runtime_init()
 }
