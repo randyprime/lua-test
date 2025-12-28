@@ -1,5 +1,7 @@
 // raddbg 0.9.24 project file
 
+recent_file: path: "sauce/mod_compiler.odin"
+recent_file: path: "../odin/base/runtime/heap_allocator.odin"
 recent_file: path: "sauce/wasm/wasm_runtime.odin"
 recent_file: path: "sauce/utils/logger/logger.odin"
 recent_file: path: "../odin/core/log/log.odin"
@@ -17,5 +19,15 @@ target:
 debug_info:
 {
   path: "C:/rando/dev/lua-test/build/windows_debug/game.pdb"
-  timestamp: 66202040669517
+  timestamp: 66202294638371
+}
+debug_info:
+{
+  path: "c:/rando/dev/lua-test/build/windows_debug/game.pdb"
+  timestamp: 66202295118203
+}
+debug_info:
+{
+  path: "C:/rando/dev/lua-test/mods/core/core.pdb"
+  timestamp: 66202295118414
 }

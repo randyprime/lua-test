@@ -21,7 +21,6 @@ import "core:encoding/cbor"
 
 import sapp "sokol/app"
 import spall "core:prof/spall"
-import wasm "wasm"
 
 VERSION :string: "v0.0.0"
 WINDOW_TITLE :: "Template [bald]"
@@ -30,10 +29,8 @@ GAME_RES_HEIGHT :: 270
 window_w := 1280
 window_h := 720
 
-// WASM mod system globals
-loaded_mods: map[string]^wasm.Wasm_Mod
-mod_compiler: Mod_Compiler
-file_watcher: File_Watcher
+// DLL mod system globals
+loaded_mods: map[string]^Wasm_Mod
 
 when NOT_RELEASE {
 	// can edit stuff in here to be whatever for testing
@@ -224,34 +221,34 @@ get_sprite_center_mass :: proc(img: Sprite_Name) -> Vec2 {
 app_init :: proc() {
 	// Initialize WASM runtime
 	wasm_runtime_init()
-	
+
 	// Set host context for API calls
-	wasm.set_host_context(&ctx, &our_context)
-	
-	// Initialize mod compiler
-	mod_compiler = mod_compiler_create()
-	mod_compiler_add_mod(&mod_compiler, "mods/core")
-	
+	set_host_context(&ctx, &our_context)
+
+	// Add mod to compiler
+	mod_compiler_add_mod("mods/core")
+
 	// Compile core mod
-	if !compile_mod_to_wasm(&mod_compiler, "mods/core") {
+	if !compile_mod_to_wasm("mods/core") {
 		log.error("Failed to compile core mod!")
 	}
-	
+
 	// Load core mod
 	wasm_path := get_mod_wasm_path("mods/core")
-	defer delete(wasm_path)
-	core_mod, core_ok := wasm.load_wasm_mod(wasm_path, "core")
+	core_mod, core_ok := load_wasm_mod(wasm_path, "core")
 	if !core_ok {
 		log.error("Failed to load core mod!")
 	} else {
 		loaded_mods["core"] = core_mod
-		wasm.call_mod_init(core_mod)
+		call_mod_init(core_mod)
 		log.info("Core mod loaded and initialized")
 	}
-	
-	// Initialize file watcher for hot-reload
-	file_watcher = file_watcher_create(".odin", 1.0)
-	file_watcher_add_directory(&file_watcher, "mods")
+
+	// Add directory to file watcher for hot-reload
+	file_watcher_add_directory("mods")
+
+	// Watch the DLL for external builds (focus-triggered reload)
+	file_watcher_add_dll("mods/core/core.dll")
 }
 
 app_frame :: proc() {
@@ -280,17 +277,13 @@ app_frame :: proc() {
 
 app_shutdown :: proc() {
 	// called on exit
-	
+
 	// Unload all mods
 	for name, mod in loaded_mods {
-		wasm.unload_wasm_mod(mod)
+		unload_wasm_mod(mod)
 	}
-	delete(loaded_mods)
-	
-	// Cleanup systems
-	file_watcher_destroy(&file_watcher)
-	mod_compiler_destroy(&mod_compiler)
-	wasm.wasm_runtime_shutdown()
+
+	// DLL runtime has no shutdown (no external runtime to clean up)
 }
 
 game_update :: proc() {
@@ -320,32 +313,32 @@ game_update :: proc() {
 		}
 	}
 	
-	// Hot-reload check
+	// Focus-triggered DLL hot reload (for external builds via build_mod.bat)
+	if get_and_clear_window_just_focused() {
+		if file_watcher_dll_changed() {
+			log.info("DLL changed while unfocused, reloading...")
+			if mod, ok := loaded_mods["core"]; ok {
+				if reload_wasm_mod(mod) {
+					log.info("Hot-reloaded mod: core")
+				}
+			}
+		}
+	}
+
+	// Hot-reload check for source file changes (in-editor workflow)
 	{
 		current_time := utils.seconds_since_init()
-		changed_files := file_watcher_check(&file_watcher, current_time)
-		defer {
-			for file in changed_files {
-				delete(file)
-			}
-			delete(changed_files)
-		}
-		
+		changed_files := file_watcher_check(current_time)
+
 		if len(changed_files) > 0 {
 			log.info("Files changed, recompiling mods...")
-			recompiled := check_and_recompile(&mod_compiler, changed_files[:])
-			defer {
-				for mod_path in recompiled {
-					delete(mod_path)
-				}
-				delete(recompiled)
-			}
-			
+			recompiled := check_and_recompile(changed_files[:])
+
 			// Reload the recompiled mods
 			for mod_path in recompiled {
 				mod_name := "core" // For now, we only have core mod
 				if mod, ok := loaded_mods[mod_name]; ok {
-					if wasm.reload_wasm_mod(mod) {
+					if reload_wasm_mod(mod) {
 						log.infof("Hot-reloaded mod: %s", mod_name)
 					}
 				}
@@ -365,7 +358,7 @@ game_update :: proc() {
 		if e.is_wasm_entity {
 			// Call the WASM mod's entity_update_by_name function
 			if core_mod, ok := loaded_mods["core"]; ok {
-				wasm.call_entity_update_by_name(core_mod, e.wasm_script_name, e.wasm_entity_id, ctx.delta_t)
+				call_entity_update_by_name(core_mod, cstring(raw_data(e.wasm_script_name)), e.wasm_entity_id, ctx.delta_t)
 			}
 		} else if e.update_proc != nil {
 			e.update_proc(e)
@@ -642,12 +635,13 @@ wasm_call_entity_update :: proc(e: ^Entity) {
 	
 	// Call the core mod's entity_update_by_name function
 	if core_mod, ok := loaded_mods["core"]; ok {
-		wasm.call_entity_update_by_name(core_mod, e.wasm_script_name, e.wasm_entity_id, ctx.delta_t)
+		call_entity_update_by_name(core_mod, cstring(raw_data(e.wasm_script_name)), e.wasm_entity_id, ctx.delta_t)
 	}
 }
 
-// Initialize WASM runtime
+// Initialize DLL runtime (was WASM runtime)
 wasm_runtime_init :: proc() -> bool {
-	loaded_mods = make(map[string]^wasm.Wasm_Mod)
-	return wasm.wasm_runtime_init()
+	loaded_mods = make(map[string]^Wasm_Mod)
+	dll_runtime_init()
+	return true
 }

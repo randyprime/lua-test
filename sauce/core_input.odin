@@ -87,6 +87,16 @@ window_resize_callback: proc(width: int, height: int)
 
 _actual_input_state: Input
 
+// Window focus tracking for hot reload
+window_has_focus: bool = true
+window_just_focused: bool = false
+
+get_and_clear_window_just_focused :: proc() -> bool {
+	result := window_just_focused
+	window_just_focused = false
+	return result
+}
+
 import "utils/logger"
 
 // takes all the incoming input events
@@ -134,6 +144,13 @@ event_callback :: proc "c" (event: ^sapp.Event) { // events example: https://flo
 		if event.key_repeat {
 			input_state.keys[event.key_code] += { .repeat }
 		}
+
+		case .FOCUSED:
+		window_has_focus = true
+		window_just_focused = true
+
+		case .UNFOCUSED:
+		window_has_focus = false
 	}
 }
 

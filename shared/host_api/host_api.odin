@@ -22,34 +22,40 @@ Vec2 :: struct {
 // Entity API
 // ============================================================================
 
-when ODIN_ARCH == .wasm32 {
-	// Guest side: import from host
-	foreign import host "env"
-	
+when ODIN_BUILD_MODE == .Dynamic {
+	// DLL side: import from host executable's export library
+	when ODIN_OS == .Windows {
+		foreign import host "../../build/windows_debug/game.lib"
+	} else when ODIN_OS == .Darwin {
+		foreign import host "../../build/mac_debug/game"
+	} else {
+		foreign import host "../../build/linux_debug/game"
+	}
+
 	@(default_calling_convention="c")
 	foreign host {
 		// Position
 		host_entity_get_pos :: proc(entity_id: u64, out_x, out_y: ^f32) ---
 		host_entity_set_pos :: proc(entity_id: u64, x, y: f32) ---
-		
+
 		// Flip
 		host_entity_get_flip_x :: proc(entity_id: u64) -> c.bool ---
 		host_entity_set_flip_x :: proc(entity_id: u64, flip: c.bool) ---
-		
+
 		// Rotation
 		host_entity_get_rotation :: proc(entity_id: u64) -> f32 ---
 		host_entity_set_rotation :: proc(entity_id: u64, rotation: f32) ---
-		
+
 		// Animation
 		host_entity_set_animation :: proc(entity_id: u64, sprite_name: cstring, frame_duration: f32, loop: c.bool) ---
-		
+
 		// Spawning/Destroying
 		host_spawn_entity :: proc(script_name: cstring, x, y: f32) -> u64 ---
 		host_destroy_entity :: proc(entity_id: u64) ---
 	}
-	
+
 } else {
-	// Host side: stub declarations (actual implementations in wasm_host_api.odin)
+	// Host side: stub declarations (actual implementations in dll_host_api.odin)
 	host_entity_get_pos :: proc(entity_id: u64, out_x, out_y: ^f32) { }
 	host_entity_set_pos :: proc(entity_id: u64, x, y: f32) { }
 	host_entity_get_flip_x :: proc(entity_id: u64) -> c.bool { return false }
@@ -65,7 +71,7 @@ when ODIN_ARCH == .wasm32 {
 // Input API
 // ============================================================================
 
-when ODIN_ARCH == .wasm32 {
+when ODIN_BUILD_MODE == .Dynamic {
 	@(default_calling_convention="c")
 	foreign host {
 		host_get_input_vector :: proc(out_x, out_y: ^f32) ---
@@ -82,7 +88,7 @@ when ODIN_ARCH == .wasm32 {
 // Game State API
 // ============================================================================
 
-when ODIN_ARCH == .wasm32 {
+when ODIN_BUILD_MODE == .Dynamic {
 	@(default_calling_convention="c")
 	foreign host {
 		host_get_delta_time :: proc() -> f32 ---
@@ -97,7 +103,7 @@ when ODIN_ARCH == .wasm32 {
 // Logging API
 // ============================================================================
 
-when ODIN_ARCH == .wasm32 {
+when ODIN_BUILD_MODE == .Dynamic {
 	@(default_calling_convention="c")
 	foreign host {
 		host_log_info :: proc(message: cstring) ---
@@ -111,10 +117,10 @@ when ODIN_ARCH == .wasm32 {
 }
 
 // ============================================================================
-// Convenience wrappers for WASM guest code
+// Convenience wrappers for DLL guest code
 // ============================================================================
 
-when ODIN_ARCH == .wasm32 {
+when ODIN_BUILD_MODE == .Dynamic {
 	// Nicer API for getting position as Vec2
 	entity_get_pos :: proc "contextless" (entity_id: u64) -> Vec2 {
 		pos: Vec2

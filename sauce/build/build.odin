@@ -178,6 +178,9 @@ main :: proc() {
 			append(&c, fmt.tprintf("-define:RELEASE=%v", release))
 			append(&c, "-o:speed")
 		}
+		// Export symbols for DLL mods to link against and create import library
+		implib_path := fmt.tprintf("/IMPLIB:%v/game.lib", out_dir)
+		append(&c, fmt.tprintf("-extra-linker-flags:%s /EXPORT:host_entity_get_pos /EXPORT:host_entity_set_pos /EXPORT:host_entity_get_flip_x /EXPORT:host_entity_set_flip_x /EXPORT:host_entity_get_rotation /EXPORT:host_entity_set_rotation /EXPORT:host_entity_set_animation /EXPORT:host_spawn_entity /EXPORT:host_destroy_entity /EXPORT:host_get_input_vector /EXPORT:host_key_down /EXPORT:host_key_pressed /EXPORT:host_get_delta_time /EXPORT:host_get_game_time /EXPORT:host_log_info /EXPORT:host_log_warn /EXPORT:host_log_error", implib_path))
 		// not needed, it's easier to just generate code into generated.odin
 		utils.fire(..c[:])
 	}
@@ -196,9 +199,6 @@ main :: proc() {
 			append(&files_to_copy, "sauce/fmod/studio/lib/windows/x64/fmodstudioL.dll")
 			append(&files_to_copy, "sauce/fmod/core/lib/windows/x64/fmod.dll")
 			append(&files_to_copy, "sauce/fmod/core/lib/windows/x64/fmodL.dll")
-
-			// Wasmtime DLL
-			append(&files_to_copy, "sauce/wasm/wasmtime-c/lib/wasmtime.dll")
 
 		case .mac:
 			// FMOD DLLs
@@ -229,7 +229,7 @@ main :: proc() {
 		utils.copy_directory(fmt.tprintf("%v/res", out_dir), "res")
 	}
 	
-	// copy mods folder (always copy for WASM modding)
+	// copy mods folder (always copy for DLL modding)
 	{
 		mods_dest := fmt.tprintf("%v/mods", out_dir)
 		utils.copy_directory(mods_dest, "mods")

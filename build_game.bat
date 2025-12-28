@@ -1,0 +1,3 @@
+@echo off
+echo Building main game...
+odin run sauce\build -debug -- testarg
