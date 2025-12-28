@@ -1,3 +1,6 @@
+*.rbg
+*.pdb
+*.exp
 atlas.png
 build.exe
 /build

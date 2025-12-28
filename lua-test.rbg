@@ -1,5 +1,10 @@
 // raddbg 0.9.24 project file
 
+recent_file: path: "sauce/dll_host_api.odin"
+recent_file: path: "sauce/entity.odin"
+recent_file: path: "mods/core/core.odin"
+recent_file: path: "sauce/dll_runtime.odin"
+recent_file: path: "../odin/base/runtime/core_builtin.odin"
 recent_file: path: "sauce/mod_compiler.odin"
 recent_file: path: "../odin/base/runtime/heap_allocator.odin"
 recent_file: path: "sauce/wasm/wasm_runtime.odin"
@@ -19,7 +24,7 @@ target:
 debug_info:
 {
   path: "C:/rando/dev/lua-test/build/windows_debug/game.pdb"
-  timestamp: 66202294638371
+  timestamp: 66202299062014
 }
 debug_info:
 {
@@ -29,5 +34,10 @@ debug_info:
 debug_info:
 {
   path: "C:/rando/dev/lua-test/mods/core/core.pdb"
-  timestamp: 66202295118414
+  timestamp: 66202298625238
+}
+debug_info:
+{
+  path: "c:/rando/dev/lua-test/mods/core/core.pdb"
+  timestamp: 66202299062266
 }

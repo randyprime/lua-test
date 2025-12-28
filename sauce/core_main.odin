@@ -87,6 +87,7 @@ core_app_init :: proc "c" () { // these sokol callbacks are c procs
 	entity_init_core()
 
 	_actual_game_state = new(Game_State)
+	ctx.gs = _actual_game_state
 
 	window_resize_callback = proc(width: int, height: int) {
 		window_w = width
