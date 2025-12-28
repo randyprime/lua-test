@@ -24,20 +24,30 @@ target:
 debug_info:
 {
   path: "C:/rando/dev/lua-test/build/windows_debug/game.pdb"
-  timestamp: 66202299062014
+  timestamp: 66202303461940
 }
 debug_info:
 {
   path: "c:/rando/dev/lua-test/build/windows_debug/game.pdb"
-  timestamp: 66202295118203
+  timestamp: 66202303297266
 }
 debug_info:
 {
   path: "C:/rando/dev/lua-test/mods/core/core.pdb"
-  timestamp: 66202298625238
+  timestamp: 66202303462265
 }
 debug_info:
 {
   path: "c:/rando/dev/lua-test/mods/core/core.pdb"
-  timestamp: 66202299062266
+  timestamp: 66202303297513
+}
+debug_info:
+{
+  path: "c:/rando/dev/lua-test/mods/example_mod/example_mod.pdb"
+  timestamp: 66202303297659
+}
+debug_info:
+{
+  path: "C:/rando/dev/lua-test/mods/example_mod/example_mod.pdb"
+  timestamp: 66202303462415
 }

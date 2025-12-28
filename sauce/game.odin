@@ -249,6 +249,25 @@ app_init :: proc() {
 
 	// Watch the DLL for external builds (focus-triggered reload)
 	file_watcher_add_dll("mods/core/core.dll")
+
+	// Add example mod
+	mod_compiler_add_mod("mods/example_mod")
+
+	if !compile_mod_to_wasm("mods/example_mod") {
+		log.error("Failed to compile example mod!")
+	}
+
+	example_path := get_mod_wasm_path("mods/example_mod")
+	example_mod, example_ok := load_wasm_mod(example_path, "example_mod")
+	if !example_ok {
+		log.error("Failed to load example mod!")
+	} else {
+		loaded_mods["example_mod"] = example_mod
+		call_mod_init(example_mod)
+		log.info("Example mod loaded and initialized")
+	}
+
+	file_watcher_add_dll("mods/example_mod/example_mod.dll")
 }
 
 app_frame :: proc() {

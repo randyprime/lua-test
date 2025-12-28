@@ -19,7 +19,7 @@ mod_init :: proc "c" () {
 	// The host will track entity script names and call entity_update_by_name
 	_ = api.spawn_entity("player", 0, 0)
 	_ = api.spawn_entity("wanderer", -60, 0)
-	_ = api.spawn_entity("spinner", 60, 0)
+	// _ = api.spawn_entity("spinner", 60, 0)
 }
 
 // Mod update - called every frame
